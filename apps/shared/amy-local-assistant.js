@@ -390,7 +390,7 @@
       found.push('market_intel');
     }
     if (
-      /\b(jurnal|journal|transaksi|profit|rugi|loss|winrate|win rate|profit factor|pips|performa|evaluasi|kesalahan|emosi|disiplin|psikologi|fomo|overtrade|revenge|habit|kebiasaan|streak)\b/.test(
+      /\b(jurnal|journal|transaksi|profit|rugi|loss|winrate|win rate|profit factor|pips|performa|evaluasi|kesalahan|emosi|disiplin|psikologi|fomo|overtrade|revenge|habit|kebiasaan|streak|equity|ekuitas|kurva|drawdown|dd|expectancy|kebocoran|leak|sesi terbaik|sesi paling)\b/.test(
         q
       )
     ) {
@@ -572,6 +572,33 @@
       if (habitInfo.summaryText) parts.push(habitInfo.summaryText);
       parts.push(`• Catat setiap setup XAU/USD (entry, SL, emosi, dan hasil R) di menu **Jurnal & Habits** agar saya bisa mengevaluasi win rate dan jam paling profitmu.`);
       return parts.join('\n');
+    }
+
+    if (root.AmyJournalAnalyticsPro?.formatForAssistant) {
+      const proResult = root.AmyJournalAnalyticsPro.formatForAssistant(rows, {
+        range: 'all',
+        unit: 'auto',
+        defaultBalance: habitInfo.defaultBalance || 0,
+        defaultRisk: habitInfo.defaultRisk || 0
+      });
+      if (proResult?.text) {
+        const proLines = [proResult.text];
+        if (habitInfo.summaryText) proLines.push(habitInfo.summaryText);
+        if (proResult.data?.executionBrief?.bullets?.length) {
+          proLines.push(`• **Sorotan Eksekusi:** ${proResult.data.executionBrief.bullets.join(' ')}`);
+        }
+        let sortedPro = rows.slice().sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')));
+        if (/loss|rugi|kalah/.test(norm(q))) sortedPro = sortedPro.filter(r => norm(r.result || r.outcome) === 'loss');
+        else if (/win|menang/.test(norm(q)) && !/rate|rasio/.test(norm(q))) sortedPro = sortedPro.filter(r => norm(r.result || r.outcome) === 'win');
+        const recentPro = sortedPro.slice(0, 3).map(r => {
+          const note = r.evaluation || r.mistakes || r.lessons || r.setup || '';
+          return `  - ${r.date || ''} · **${r.pair || r.market || r.title || 'XAU/USD'}** (${r.result || r.outcome || 'Open'})${note ? ' — ' + String(note).slice(0, 140) : ''}`;
+        });
+        if (recentPro.length) {
+          proLines.push('• **Catatan Terbaru:**', ...recentPro);
+        }
+        return proLines.join('\n');
+      }
     }
 
     const win = rows.filter(r => norm(r.result || r.outcome) === 'win').length;
@@ -928,11 +955,35 @@
         s.src = new URL('amy-local-knowledge.js', script).href;
         document.head.appendChild(s);
       });
+      if (!root.AmyJournalAnalyticsPro) {
+        const jp = document.createElement('script');
+        jp.src = new URL('journal-analytics-pro.js', script).href;
+        jp.async = true;
+        document.head.appendChild(jp);
+      }
       const g = document.createElement('script');
       g.src = new URL('amy-gemini-live-bridge.js', script).href;
       g.async = true;
       document.head.appendChild(g);
     }
+  }
+
+  function openWithPrompt(promptText) {
+    if (!root.document) return false;
+    root.dispatchEvent(new CustomEvent('amyfx:open-mentor'));
+    const q = String(promptText || '').trim();
+    if (!q) return true;
+    setTimeout(() => {
+      const panel = document.getElementById('amy-local-panel');
+      const form = panel?.querySelector('form');
+      const input = form?.querySelector('input');
+      if (input && form) {
+        input.value = q;
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }
+    }, 120);
+    return true;
   }
 
   root.AmyLocalAssistant = Object.freeze({
@@ -949,7 +1000,8 @@
     practice,
     academy,
     knowledge,
-    readJournals
+    readJournals,
+    openWithPrompt
   });
 
   if (root.document) {

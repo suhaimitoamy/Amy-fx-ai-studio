@@ -1,5 +1,10 @@
 # Feature History
 
+## 2026-11-19 — Analitik Jurnal Pro & Equity Curve Interaktif (Beranda + Jurnal + Amy Live)
+- **Single-Source-of-Truth Engine (`apps/shared/journal-analytics-pro.js`):** Kalkulasi Equity Curve & Underwater Drawdown, Profit Factor, Expectancy per Trade, Max Drawdown & Drawdown Aktif, Streak Win/Loss, Performa per Sesi WITA (Asia/London/NY AM/NY PM), Performa per Setup ICT, serta Detektor Kebocoran Profit & Psikologi (Leak Cost).
+- **Integrasi Beranda & Modul Jurnal:** Kartu ringkas **Performa Jurnal** (mini Equity Curve, 4 KPI tabular, sorotan eksekusi, deep-link `?view=statistics` & `?action=new`) di bawah Peta Harga Beranda, dan dashboard interaktif penuh dengan filter `7H | 30H | 90H | Semua`, toggle `Nominal $ | R-Multiple`, serta pointer/touch scrubber di Modul Jurnal.
+- **Koneksi Penuh Amy Live 2.0:** Tombol **Evaluasi bareng Amy** (`openWithPrompt`), perluasan intent (`equity`, `drawdown`, `profit factor`, `expectancy`, `kebocoran`, `sesi terbaik`), serta sinkronisasi output `get_journal_summary` untuk Chat dan Live Voice.
+
 ## 2026-11-19 — Amy Live 2.0 (All-App Trading Brain, Client-Bridge Live Voice & Dark/Light UX)
 - **Client-Bridge & Live Voice Dipertahankan:** Tetap menggunakan `/api/gemini-config` + WebSocket langsung browser ke `models/gemini-3.8-live` (Aoede), dilengkapi 10 tool terintegrasi (`get_mapping_structure_details`, `get_market_news_summary`, `get_journal_summary` IndexedDB+Habits, `calculate_gold_lot`, `get_practice_summary`, `switch_chart_timeframe`, dll).
 - **100% Fokus Trading XAU/USD & Smart Context Router:** Sinkronisasi Dealing Range (`BREAKDOWN · 0%`, Diskon, EQ, Premium, Breakout) & likuiditas BSL/SSL valid, kalkulator lot XAU/USD instan berbasis `amy_default_balance` & `amy_default_risk`, filter screenshot chart ketat, dan deduplikasi tombol aksi (maks 2 link relevan).
