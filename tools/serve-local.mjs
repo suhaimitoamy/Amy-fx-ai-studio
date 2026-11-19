@@ -1,5 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -10,9 +11,13 @@ const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = parseInt(process.env.PORT || '8080', 10);
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
-const ROOT_DIR = path.resolve(__dirname, '../app/src/main/assets');
+const ANDROID_ASSETS_DIR = path.resolve(__dirname, '../app/src/main/assets');
+const REPO_ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR = fs.existsSync(path.join(ANDROID_ASSETS_DIR, 'index.html'))
+  ? ANDROID_ASSETS_DIR
+  : REPO_ROOT_DIR;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -39,7 +44,9 @@ const MIME_TYPES = {
 let localCalendarCache = null;
 let localCalendarCachedAt = 0;
 
-const CANDLE_CACHE_FILE = path.resolve(ROOT_DIR, 'data/candle_cache.json');
+const CANDLE_CACHE_FILE = ROOT_DIR === ANDROID_ASSETS_DIR
+  ? path.resolve(ROOT_DIR, 'data/candle_cache.json')
+  : path.join(os.tmpdir(), 'amyfx-candle-cache.json');
 const localCandleCache = new Map();
 let lastScalperSetupsPayload = null;
 
@@ -711,13 +718,58 @@ const requestHandler = async (req, res) => {
       }
     }
 
+    if (pathname === '/api/heatmap' || pathname === '/api/liquidity' || pathname === '/api/learning-live-example') {
+      try {
+        const handlerModule = pathname === '/api/heatmap'
+          ? '../api/heatmap.js'
+          : pathname === '/api/liquidity'
+            ? '../api/liquidity.js'
+            : '../api/learning-live-example.js';
+        const handler = (await import(handlerModule)).default;
+        let statusCode = 200;
+        const outHeaders = {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json; charset=utf-8'
+        };
+        const fakeRes = {
+          setHeader: (k, v) => { outHeaders[k] = v; },
+          status: (c) => { statusCode = c; return fakeRes; },
+          json: (d) => {
+            res.writeHead(statusCode, outHeaders);
+            res.end(JSON.stringify(d));
+          },
+          send: (d) => {
+            res.writeHead(statusCode, outHeaders);
+            res.end(typeof d === 'string' ? d : JSON.stringify(d));
+          },
+          end: (d) => {
+            res.writeHead(statusCode, outHeaders);
+            res.end(d);
+          }
+        };
+        const fakeReq = {
+          method: req.method,
+          headers: req.headers,
+          query: Object.fromEntries(parsedUrl.searchParams.entries())
+        };
+        await handler(fakeReq, fakeRes);
+        return;
+      } catch (err) {
+        res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+        return;
+      }
+    }
+
     // --- AMY FX PRO GEMINI AI BRIDGE (/api/gemini-config & /api/gemini-chat) ---
     if (pathname === '/api/gemini-config') {
-      let apiKey = '';
-      try {
-        const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
-        apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || rawKeys.split('\n')[0].trim();
-      } catch (_) {}
+      let apiKey = process.env.GEMINI_API_KEY?.trim() || '';
+      if (!apiKey) {
+        try {
+          const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
+          apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || rawKeys.split('\n')[0].trim();
+        } catch (_) {}
+      }
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
@@ -737,14 +789,16 @@ const requestHandler = async (req, res) => {
       req.on('data', chunk => { body += chunk; });
       req.on('end', async () => {
         try {
-          let apiKey = '';
-          try {
-            const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
-            apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || rawKeys.split('\n')[0].trim();
-          } catch (_) {}
+          let apiKey = process.env.GEMINI_API_KEY?.trim() || '';
+          if (!apiKey) {
+            try {
+              const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
+              apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || rawKeys.split('\n')[0].trim();
+            } catch (_) {}
+          }
           if (!apiKey) {
             res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ ok: false, error: 'API Key Gemini belum ditemukan di /root/.gemini_keys' }));
+            res.end(JSON.stringify({ ok: false, error: 'API Key Gemini belum dikonfigurasi (set GEMINI_API_KEY)' }));
             return;
           }
 
@@ -863,6 +917,12 @@ const requestHandler = async (req, res) => {
       safePath = '';
     }
 
+    if (/^(?:\.env|\.git|node_modules)(?:[\/\\]|$)/i.test(safePath)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden');
+      return;
+    }
+
     let targetPath = path.join(ROOT_DIR, safePath);
 
     if (!targetPath.startsWith(ROOT_DIR)) {
@@ -872,6 +932,12 @@ const requestHandler = async (req, res) => {
     }
 
     if (!fs.existsSync(targetPath)) {
+      if (safePath === path.join('apps', 'academy', 'trading-practice', 'vendor', 'lightweight-charts.standalone.production.js')) {
+        const npmChartBundle = path.join(REPO_ROOT_DIR, 'node_modules', 'lightweight-charts', 'dist', 'lightweight-charts.standalone.production.js');
+        if (fs.existsSync(npmChartBundle)) {
+          targetPath = npmChartBundle;
+        }
+      }
       // Check if it's an academy bagian old lesson URL: apps/academy/(bagian-[^/]+)/([^/]+).html
       const lessonMatch = safePath.match(/^apps[\\\/]academy[\\\/](bagian-[^\\\/]+)[\\\/]([^\\\/]+)\.html$/);
       if (lessonMatch && lessonMatch[2] !== 'index') {
@@ -974,13 +1040,15 @@ server.listen(PORT, HOST, () => {
   console.log(`    - Academy          : http://localhost:${PORT}/apps/academy/`);
   console.log('====================================================');
 
-  const altPort = PORT === 8080 ? 8081 : 8080;
-  const altServer = http.createServer(requestHandler);
-  altServer.on('error', () => {});
-  altServer.listen(altPort, HOST, () => {
-    console.log(`  > Akses Mirror (Port Alternatif):`);
-    console.log(`    👉 http://localhost:${altPort}`);
-    console.log('====================================================');
-  });
+  if (process.env.ENABLE_ALT_PORT === '1') {
+    const altPort = PORT === 8080 ? 8081 : 8080;
+    const altServer = http.createServer(requestHandler);
+    altServer.on('error', () => {});
+    altServer.listen(altPort, HOST, () => {
+      console.log(`  > Akses Mirror (Port Alternatif):`);
+      console.log(`    👉 http://localhost:${altPort}`);
+      console.log('====================================================');
+    });
+  }
 });
 
