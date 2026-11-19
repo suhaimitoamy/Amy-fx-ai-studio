@@ -1,5 +1,10 @@
 # Technical Decisions
 
+## 2026-11-19 — Amy Live 2.0 (100% Fokus Trading XAU/USD, Client-Bridge WebSocket Live Voice Dipertahankan)
+1. **Arsitektur AI Dipertahankan:** Mekanisme lama client bridge (`apps/shared/amy-gemini-live-bridge.js`), `/api/gemini-config`, dan koneksi WebSocket langsung browser ke Google (`BidiGenerateContent`) dipertahankan 100% agar fitur suara real-time dua arah **Amy Live Voice** (`models/gemini-3.8-live`, suara `Aoede`) tetap berjalan mulus di Vercel, Termux, dan Android WebView.
+2. **Validasi Kunci & Rantai Model Free-Tier:** Menambahkan `isValidGeminiApiKey` di `lib/amy-assistant-engine.mjs`, `api/gemini-config.js`, `api/gemini-chat.js`, dan `amy-gemini-live-bridge.js` untuk menolak placeholder (`MY_GEMINI_API_KEY`). Rantai model teks diurutkan `['gemini-3.1-flash-lite', 'gemini-4-hydrogen']` untuk respons cepat tanpa 503, dengan `tools/serve-local.mjs` langsung mendelegasikan ke handler `api/gemini-*.js`.
+3. **Koneksi Penuh Semua Modul & UI Dark/Light:** Menambahkan Smart Context Router (Mapping tersinkron `BREAKDOWN · 0%` + BSL/SSL valid, Market Intel Kalender USD + Berita, Jurnal IndexedDB + Habits & Streak, Kalkulator Lot XAU/USD instan, Trading Practice, Academy/Glosarium), serta perbaikan kontras penuh Light Mode (`data-amyfx-theme="light"`), Fullscreen Orb header full-bleed, indikator mengetik, Markdown aman, dan tombol Salin.
+
 ## 2026-11-11 — Resolusi Materi Berbasis Riwayat Obrolan, Navigasi Langsung Bab Mandiri, & Anti-Stuck Visual (v2.0.0-pro.446)
 1. **Latar Belakang & Masalah:**
    - Saat pengguna mengetik "Buka materinya" setelah Amy menjelaskan materi "Breaker Block":

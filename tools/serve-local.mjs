@@ -761,151 +761,59 @@ const requestHandler = async (req, res) => {
       }
     }
 
-    // --- AMY FX PRO GEMINI AI BRIDGE (/api/gemini-config & /api/gemini-chat) ---
-    if (pathname === '/api/gemini-config') {
-      let apiKey = process.env.GEMINI_API_KEY?.trim() || '';
-      if (!apiKey) {
+    // --- AMY FX PRO GEMINI AI BRIDGE (/api/gemini-config & /api/gemini-chat — single source of truth) ---
+    if (pathname === '/api/gemini-config' || pathname === '/api/gemini-chat') {
+      const dispatchGemini = async (rawBody = '') => {
         try {
-          const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
-          apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || rawKeys.split('\n')[0].trim();
-        } catch (_) {}
-      }
-      res.writeHead(200, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-store'
-      });
-      res.end(JSON.stringify({
-        ok: Boolean(apiKey),
-        apiKey,
-        liveModel: 'models/gemini-3.8-live',
-        voiceName: 'Aoede'
-      }));
-      return;
-    }
-
-    if (pathname === '/api/gemini-chat' && req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', async () => {
-        try {
-          let apiKey = process.env.GEMINI_API_KEY?.trim() || '';
-          if (!apiKey) {
-            try {
-              const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
-              apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || rawKeys.split('\n')[0].trim();
-            } catch (_) {}
+          const handlerModule = pathname === '/api/gemini-config'
+            ? '../api/gemini-config.js'
+            : '../api/gemini-chat.js';
+          const handler = (await import(handlerModule)).default;
+          let statusCode = 200;
+          const outHeaders = {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json; charset=utf-8'
+          };
+          const fakeRes = {
+            setHeader: (k, v) => { outHeaders[k] = v; },
+            status: (c) => { statusCode = c; return fakeRes; },
+            json: (d) => {
+              res.writeHead(statusCode, outHeaders);
+              res.end(JSON.stringify(d));
+            },
+            send: (d) => {
+              res.writeHead(statusCode, outHeaders);
+              res.end(typeof d === 'string' ? d : JSON.stringify(d));
+            },
+            end: (d) => {
+              res.writeHead(statusCode, outHeaders);
+              res.end(d);
+            }
+          };
+          let parsedBody = rawBody;
+          if (rawBody && typeof rawBody === 'string') {
+            try { parsedBody = JSON.parse(rawBody); } catch (_) {}
           }
-          if (!apiKey) {
-            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ ok: false, error: 'API Key Gemini belum dikonfigurasi (set GEMINI_API_KEY)' }));
-            return;
-          }
-
-          const payload = body ? JSON.parse(body) : {};
-          const message = String(payload.message || '').trim();
-          const appContext = String(payload.appContext || '').trim();
-          const imageBase64 = payload.imageBase64 ? String(payload.imageBase64).replace(/^data:image\/\w+;base64,/, '') : '';
-          const history = Array.isArray(payload.history) ? payload.history.slice(-8) : [];
-
-          const isAskingFullMaterial = /\b(full|lengkap|buka|pelajari|jelaskan|materi|modul|level|bab)\b/i.test(message);
-
-          const sysPrompt =
-            `Kamu adalah AMY (✦ AMY), asisten trading pintar, setia, dan berwawasan tajam di dalam aplikasi Amy FX Pro.\n` +
-            `Panggil pengguna selalu dengan sebutan "Sayang" dengan nada bicara yang hangat, suportif, ramah, dan percaya diri dalam Bahasa Indonesia yang luwes.\n` +
-            `PROFIL TRADING SAYANG:\n` +
-            `- Pure Gold Scalper (XAU/USD) timeframe M15 & M5 dengan target presisi 100 Pips ($10).\n` +
-            `- Zona waktu acuan: WITA (UTC+8).\n` +
-            `- Istilah wajib standar trader pro: Support / Demand, Resistance / Supply, No-Trade Zone (jangan entry di tengah), Dealing Range (Premium/Discount/EQ 50%), PDH/PDL, PWH/PWL, Asia High/Low, FVG, Order Block, BSL/SSL, MSS/BOS.\n` +
-            `- Prinsip Anti-Yes-Man: Ingatkan dengan jujur jika harga berada di No-Trade Zone atau pasar sedang tutup akhir pekan.\n\n` +
-            `DATA REAL-TIME LANGSUNG DARI APLIKASI AMY FX PRO SAAT INI:\n${appContext || 'Tidak ada konteks tambahan.'}\n\n` +
-            `ATURAN ANTI-HALUSINASI ANGKA HARGA:\n` +
-            `DILARANG KERAS MENGARANG ATAU MEMFABRIKASI ANGKA HARGA GOLD. Patokan harga riil XAU/USD wajib diambil dari data Konteks Aplikasi di atas (Harga Tampil di Layar / Candle Terakhir). Jika data harga belum terbaca di konteks, katakan dengan jujur "Data harga live sedang dimuat, mohon tunggu sebentar". JANGAN PERNAH mengarang angka seperti 4000+!\n\n` +
-            `ATURAN JAWABAN & AKSES PENUH MATERI ACADEMY:\n` +
-            `- Tulis teks yang bersih dan rapi, gunakan tanda titik bulat (•) untuk poin-poin agar nyaman dibaca.\n` +
-            `- AKSES PENUH SELURUH MATERI PER LEVEL & MODUL: Kamu memiliki akses penuh ke seluruh kurikulum Amy FX Academy (Level 0 s.d. Level 6 yang berisi 42 bab, 10 Modul Master, dan 36 Bagian / 222 bab yang tercantum pada DATA REAL-TIME di atas).\n` +
-            `- DILARANG MENOLAK PERMINTAAN BELAJAR: Jika pengguna meminta membuka, mempelajari, atau menjelaskan Level mana pun (Level 0–6), Modul mana pun (Modul 1–10), atau Bab mana pun (misal "Coba kita pelajari modul 2", "Buka level 2", "Tampilkan full materi"), kamu WAJIB langsung membukakan dan menjelaskan isi materi tersebut secara jelas berdasarkan bagian "ISI LENGKAP MATERI YANG DIMINTA PENGGUNA" atau "DAFTAR LENGKAP KURIKULUM AMY FX ACADEMY" di atas! JANGAN PERNAH menolak atau menyuruh menyelesaikan Modul 01 dulu!\n` +
-            `- Jika pengguna hanya bertanya "apa bacaan terakhirku?", mengaculah pada "Materi Terakhir Dibaca Pengguna" di atas.`;
-
-          const contents = [];
-          for (const h of history) {
-            if (!h || !h.text) continue;
-            contents.push({
-              role: h.role === 'model' ? 'model' : 'user',
-              parts: [{ text: String(h.text) }]
-            });
-          }
-
-          const userParts = [];
-          if (imageBase64) {
-            userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
-          }
-          userParts.push({ text: message || 'Tolong analisa gambar chart dan konteks aplikasi saat ini.' });
-          contents.push({ role: 'user', parts: userParts });
-
-          const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
-          let replyText = '';
-          let usedModel = '';
-          const maxTokens = isAskingFullMaterial ? 1000 : 700;
-
-          for (const m of modelsToTry) {
-            try {
-              const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
-              const genConfig = m.includes('2.5')
-                ? { temperature: 0.25, maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } }
-                : { temperature: 0.25, maxOutputTokens: maxTokens };
-              const resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  systemInstruction: { parts: [{ text: sysPrompt }] },
-                  generationConfig: genConfig,
-                  contents
-                }),
-                signal: AbortSignal.timeout(14000)
-              });
-              if (resp.ok) {
-                const data = await resp.json();
-                const parts = data?.candidates?.[0]?.content?.parts || [];
-                const txt = parts.filter(p => !p.thought && p.text).map(p => p.text).join('').trim() || parts[0]?.text || '';
-                if (txt) {
-                  replyText = txt;
-                  usedModel = m;
-                  break;
-                }
-              }
-            } catch (_) {}
-          }
-
-          if (!replyText) {
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({
-              ok: false,
-              error: 'Koneksi Gemini sedang sibuk, menampilkan data lokal aplikasi.'
-            }));
-            return;
-          }
-
-          replyText = replyText
-            .replace(/^[ \t]*---+[ \t]*$/gm, '')
-            .replace(/^[ \t]*#{1,6}[ \t]*/gm, '')
-            .replace(/^[ \t]*[*-][ \t]+/gm, '• ')
-            .replace(/\*\*([^*]+)\*\*/g, '$1')
-            .replace(/\*([^*\n]+)\*/g, '$1')
-            .replace(/[*#`]/g, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-
-          res.writeHead(200, {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          });
-          res.end(JSON.stringify({ ok: true, reply: replyText, model: usedModel }));
+          const fakeReq = {
+            method: req.method,
+            headers: req.headers,
+            query: Object.fromEntries(parsedUrl.searchParams.entries()),
+            body: parsedBody
+          };
+          await handler(fakeReq, fakeRes);
         } catch (err) {
-          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
           res.end(JSON.stringify({ ok: false, error: err.message }));
         }
-      });
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => { dispatchGemini(body); });
+      } else {
+        await dispatchGemini('');
+      }
       return;
     }
 

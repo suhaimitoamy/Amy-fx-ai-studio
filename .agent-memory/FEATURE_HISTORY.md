@@ -1,5 +1,10 @@
 # Feature History
 
+## 2026-11-19 — Amy Live 2.0 (All-App Trading Brain, Client-Bridge Live Voice & Dark/Light UX)
+- **Client-Bridge & Live Voice Dipertahankan:** Tetap menggunakan `/api/gemini-config` + WebSocket langsung browser ke `models/gemini-3.8-live` (Aoede), dilengkapi 10 tool terintegrasi (`get_mapping_structure_details`, `get_market_news_summary`, `get_journal_summary` IndexedDB+Habits, `calculate_gold_lot`, `get_practice_summary`, `switch_chart_timeframe`, dll).
+- **100% Fokus Trading XAU/USD & Smart Context Router:** Sinkronisasi Dealing Range (`BREAKDOWN · 0%`, Diskon, EQ, Premium, Breakout) & likuiditas BSL/SSL valid, kalkulator lot XAU/USD instan berbasis `amy_default_balance` & `amy_default_risk`, filter screenshot chart ketat, dan deduplikasi tombol aksi (maks 2 link relevan).
+- **UI/UX Dark + Light Mode:** Perbaikan judul `✦ AMY` di Light Mode, header full-bleed + kolom tengah pada Fullscreen Bubble Orb, indikator mengetik animasi, Markdown aman (`**tebal**`, poin, kode) + tombol Salin, serta bar input lega di mobile 390px.
+
 ## 2026-09-30 — Pro381 Market Intel Kompas Fundamental Architecture
 
 - **Kompas Fundamental Hub (Primary Priority & Default Tab):**
