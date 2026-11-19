@@ -22,7 +22,8 @@ from datetime import datetime, timezone, timedelta
 BOT_TOKEN = "8827515189:AAF4YNT10yS-uWfxstdLU_YHS-Z5Vl7uXfc"
 ALLOWED_USER_ID = 1351889730  # Sayang AMY
 GEMINI_API_KEY = "AIzaSyAiB-yJ-wg6Pbd_dPiaO1Q7ZJ_DzLjqsTs"
-TWELVEDATA_API_KEY = "d3d344540ec04935bf6790f0f856fdf5"
+TWELVEDATA_API_KEY = "980a8c681352471192757a5cfc709098"
+TWELVEDATA_API_KEY_BACKUP = "d3d344540ec04935bf6790f0f856fdf5"
 DB_PATH = "/root/amy-market-data/xauusd_bot.sqlite"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
