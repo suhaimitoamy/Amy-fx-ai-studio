@@ -1,0 +1,16 @@
+name: Amy FX Preview Professional UI Legacy Workflow (Disabled)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disabled:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Legacy Preview workflow disabled
+        run: |
+          echo 'Legacy professional UI Preview publisher is disabled on this branch.'
+          echo 'Use .github/workflows/amyfx-blueprint-preview-release.yml.'

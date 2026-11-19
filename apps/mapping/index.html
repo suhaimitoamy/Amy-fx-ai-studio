@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1320"><title>Amy FX Pro · Konteks Gold</title>
+<script src="../shared/amyfx-theme-controller.js"></script>
+<link rel="stylesheet" href="css/ict-workspace.css">
+<link rel="stylesheet" href="css/ict-dashboard-v2.css">
+<link rel="stylesheet" href="../shared/amyfx-ui-tokens.css">
+<link rel="stylesheet" href="../shared/amyfx-theme.css">
+<link rel="stylesheet" href="../shared/amyfx-components.css">
+<link rel="stylesheet" href="../shared/amyfx-ui-polish-pro348.css" data-amyfx-ui-polish="pro348">
+<link rel="stylesheet" href="../shared/amyfx-natural-ui-pro355.css" data-amyfx-natural-ui="pro355">
+<link rel="stylesheet" href="../shared/amyfx-obsidian-glass.css" data-amyfx-obsidian-glass="v1">
+</head>
+<body class="amyfx-module amyfx-module--mapping amyfx-module--ict">
+
+<!-- ── HEADER ── -->
+<header style="display:flex; align-items:center; justify-content:space-between; width:100%; box-sizing:border-box; padding:12px 16px;">
+  <button type="button" class="nav-arrow-btn nav-arrow-left" id="amyfxNavBack" data-amyfx-nav="back" aria-label="Kembali ke beranda">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="19" y1="12" x2="5" y2="12"></line>
+      <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+  </button>
+  <div style="flex:1; text-align:center; padding:0 8px;">
+    <small style="display:block; letter-spacing:0.14em; color:var(--muted); font-size:10px; font-weight:700;">AMY FX PRO · XAU/USD</small>
+    <h1 style="margin:2px 0 0; font-size:1.15rem; line-height:1.2; font-weight:800; color:#fff; letter-spacing:0.02em;">Market Intelligence</h1>
+    <div id="cockpit-session-pill" class="cockpit-session-pill" style="display:inline-block; margin-top:4px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:var(--amy-accent,#F5C451); letter-spacing:0.02em;">[ ⏳ Memuat Sesi... ]</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:8px;">
+    <span id="connection" role="status" style="margin:0; font-size:11px; padding:3px 8px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);">Memuat</span>
+    <button type="button" class="nav-arrow-btn nav-arrow-right" id="amyfxNavForward" data-amyfx-nav="forward" aria-label="Maju">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+        <polyline points="12 5 19 12 12 19"></polyline>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<div id="economic-event-banner" class="economic-event-banner" style="display:none;" role="alert" aria-live="polite"></div>
+<p id="error" role="alert" hidden></p>
+
+<!-- ── MAIN: 1-Page Scroll Dashboard ── -->
+<main id="app">
+  <div class="ict-dashboard-scroll">
+
+    <!-- ══════════════════════════════════════
+         CARD 1: HERO CONTEXT — Live Bias ICT
+         ══════════════════════════════════════ -->
+    <article id="hero-ict-context" class="hero-context-card" aria-label="Konteks Bias ICT Live">
+
+      <!-- Price + jam -->
+      <div class="hero-price-row">
+        <span class="hero-live-price" id="hero-price">—</span>
+        <span class="hero-eq-badge" id="hero-eq">≈ EQ —</span>
+        <span class="hero-clock" id="hero-clock">— WITA</span>
+      </div>
+
+      <!-- Bias banner -->
+      <div class="hero-bias-banner bias-neutral" id="hero-bias-banner">
+        🧭 MEMUAT DATA BIAS...
+      </div>
+
+      <!-- Warning counter-trend -->
+      <div class="hero-warning-box" id="hero-warning" hidden>
+        ⚠️ WASPADA: Hanya koreksi sementara — jangan FOMO entry melawan HTF!
+      </div>
+
+      <!-- Tabel 3-TF -->
+      <table class="hero-tf-table" aria-label="Bias 3 Timeframe">
+        <thead>
+          <tr>
+            <th>Timeframe</th>
+            <th>Bias</th>
+            <th>Kondisi</th>
+          </tr>
+        </thead>
+        <tbody id="hero-tf-tbody">
+          <tr><td colspan="3" style="text-align:center;padding:14px;color:var(--muted);">Memuat matriks bias 3-TF...</td></tr>
+        </tbody>
+      </table>
+
+      <!-- Kesimpulan bernarasi -->
+      <p class="hero-conclusion" id="hero-conclusion">
+        Menunggu data konteks terbaru dari server...
+      </p>
+
+    </article>
+
+    <!-- ══════════════════════════════════════
+         CARD 2: PETA HARGA / CHART GOLD
+         ══════════════════════════════════════ -->
+    <article class="price-map gold-price-panel">
+      <section id="gold-chart-workspace" aria-label="Chart Gold XAU/USD">
+        <div class="section-heading chart-heading">
+          <h2>Chart Gold · XAU/USD</h2>
+          <div class="chart-price-wrap" style="display:flex; align-items:center; gap:8px;">
+            <span id="chart-dealing-range-badge" class="dr-badge dr-neutral" title="Status Dealing Range (ICT)">EQUILIBRIUM 50% · NETRAL ⚪</span>
+            <strong id="chart-price">—</strong>
+          </div>
+        </div>
+        <div class="gold-chart-controls">
+          <label>Timeframe <select id="timeframe"><option value="M15">M15</option><option value="M5">M5</option></select></label>
+          <button type="button" id="refresh">Perbarui</button>
+          <button type="button" id="btn-chart-custom-price-alert" title="Pasang Alarm Target Harga">🔔 Pasang Alarm</button>
+          <button type="button" id="chart-fullscreen" aria-label="Buka fullscreen Chart Gold" aria-pressed="false">⛶ Fullscreen</button>
+        </div>
+        <p id="source" role="status">Memuat candle tertutup…</p><p id="chart-error" role="alert"></p>
+        <div id="chart" aria-label="Chart candlestick XAU/USD dengan level model ICT"></div>
+        <p id="chart-note"></p>
+      </section>
+      <details class="ict-settings" style="display:none;"><summary>Atur tampilan chart</summary><div id="ict-controls"></div></details>
+    </article>
+
+    <!-- ══════════════════════════════════════
+         CARD 3: DEALING RANGE AKTIF
+         ══════════════════════════════════════ -->
+    <article id="card-dealing-range" class="dr-card" aria-label="Dealing Range Aktif">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0;">🗺️ Dealing Range Aktif</h3>
+        <span id="dr-scope-badge" style="font-size:10.5px; font-weight:700; color:var(--amy-accent,#F5C451); background:rgba(245,196,81,0.12); border:1px solid rgba(245,196,81,0.25); border-radius:6px; padding:2px 8px;">M15 Dealing Range</span>
+      </div>
+
+      <div class="dr-visual-wrap">
+        <!-- Visual bar vertikal -->
+        <div class="dr-bar-track" aria-hidden="true">
+          <div class="dr-bar-fill" id="dr-bar-fill" style="height:50%"></div>
+          <div class="dr-bar-dot"  id="dr-bar-dot"  style="bottom:calc(50% - 8px)"></div>
+        </div>
+
+        <!-- Label level -->
+        <div class="dr-labels">
+          <div class="dr-label-row dr-bsl">
+            <span class="dr-label-name">Range High (BSL)</span>
+            <span class="dr-label-val" id="dr-bsl-val">—</span>
+          </div>
+          <div class="dr-label-row dr-eq">
+            <span class="dr-label-name">EQ 50%</span>
+            <span class="dr-label-val" id="dr-eq-val">—</span>
+          </div>
+          <div class="dr-label-row dr-ssl">
+            <span class="dr-label-name">Range Low (SSL)</span>
+            <span class="dr-label-val" id="dr-ssl-val">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status badge zona -->
+      <div class="dr-status-badge zone-eq" id="dr-status-badge">
+        ⏳ Menghitung posisi zona...
+      </div>
+
+      <!-- Konteks Dealing Range Mayor H1 / Daily (Kalibrasi ICT) -->
+      <div id="dr-major-context" style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:11px; color:var(--muted,#94A3B8); display:flex; justify-content:space-between; align-items:center;">
+        <span>Range Mayor (PDH–PDL): <strong id="dr-major-range" style="color:#CBD5E1;">—</strong></span>
+        <span>EQ Mayor: <strong id="dr-major-eq" style="color:var(--amy-accent,#F5C451);">—</strong></span>
+      </div>
+    </article>
+
+    <!-- ══════════════════════════════════════
+         CARD 4: POI SELL SETUP
+         ══════════════════════════════════════ -->
+    <article id="card-poi-sell" class="poi-card poi-card--sell" aria-label="POI Sell Setup">
+      <div class="poi-card-header">
+        <h3>🔴 SELL SETUP</h3>
+        <span class="poi-badge poi-badge--sell" id="poi-sell-badge">Target Pembalikan — Resistance Ekstrem</span>
+      </div>
+
+      <table class="poi-table poi-table--sell" aria-label="Level POI Sell">
+        <thead>
+          <tr>
+            <th>POI</th>
+            <th>Level</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody id="sell-poi-tbody">
+          <tr><td colspan="3" style="text-align:center;padding:14px;color:var(--muted);">Memuat level SELL...</td></tr>
+        </tbody>
+      </table>
+
+      <!-- SOP Entry -->
+      <div class="sop-box sop-box--sell">
+        <strong>SOP Entry SELL (Napas Spread XAUUSDc)</strong>
+        <ul id="sell-sop-list">
+          <li>Menunggu data FVG bearish dari engine...</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- ══════════════════════════════════════
+         CARD 5: POI BUY SETUP
+         ══════════════════════════════════════ -->
+    <article id="card-poi-buy" class="poi-card poi-card--buy" aria-label="POI Buy Setup">
+      <div class="poi-card-header">
+        <h3>🟢 BUY SETUP</h3>
+        <span class="poi-badge poi-badge--buy" id="poi-buy-badge">Pijakan Retest — Jemput di Demand</span>
+      </div>
+
+      <table class="poi-table poi-table--buy" aria-label="Level POI Buy">
+        <thead>
+          <tr>
+            <th>POI</th>
+            <th>Level</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody id="buy-poi-tbody">
+          <tr><td colspan="3" style="text-align:center;padding:14px;color:var(--muted);">Memuat level BUY...</td></tr>
+        </tbody>
+      </table>
+
+      <!-- Warning BUY -->
+      <div class="poi-warning-box">
+        ⚠️ <strong>Buy hanya valid</strong> jika ada konfirmasi M5: <em>Absorption Wick + Bullish Displacement</em> setelah sweep SSL. Jangan masuk sebelum konfirmasi!
+      </div>
+
+      <!-- SOP Entry BUY -->
+      <div class="sop-box sop-box--buy">
+        <strong>SOP Entry BUY (Napas Spread XAUUSDc)</strong>
+        <ul id="buy-sop-list">
+          <li>Menunggu data Demand/SSL dari engine...</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- ══════════════════════════════════════
+         CARD 6: SKENARIO PRIORITAS
+         ══════════════════════════════════════ -->
+    <article id="card-scenario" class="scenario-card" aria-label="Skenario Prioritas Hari Ini">
+      <h3>📋 Skenario Prioritas Hari Ini</h3>
+
+      <div class="scenario-price-anchor">
+        📍 Harga sekarang:
+        <strong id="scenario-price">—</strong>
+        <span class="scenario-zone-label" id="scenario-zone-label">(memuat...)</span>
+      </div>
+
+      <div class="scenario-arrows">
+        <div class="scenario-arrow scenario-arrow--up">
+          ⬆️ JIKA NAIK → Tunggu retest <strong id="sell-zone-label">zona supply</strong> → <strong>SELL</strong>
+        </div>
+        <div class="scenario-arrow scenario-arrow--down">
+          ⬇️ JIKA TURUN → Tunggu sweep SSL <strong id="buy-zone-label">zona demand</strong> → <strong>BUY konfirmasi</strong>
+        </div>
+      </div>
+
+      <div class="no-trade-zone-badge" id="no-trade-label">
+        🚫 NO-TRADE ZONE: Menghitung area EQ...
+      </div>
+    </article>
+
+    <!-- ── Last Update Bar ── -->
+    <div class="dashboard-update-bar">
+      <span id="dashboard-last-update">🔄 Belum diperbarui</span>
+      <button type="button" onclick="document.getElementById('refresh').click()">⟳ Refresh Data</button>
+    </div>
+
+  </div><!-- /.ict-dashboard-scroll -->
+
+  <!-- Hidden compat elements — WAJIB ada agar JS lama tidak error -->
+  <div style="display:none;" aria-hidden="true">
+    <div id="Dashboard"></div><div id="Analyze"></div><div id="History"></div>
+    <span id="context-state"></span><strong id="market-state"></strong><p id="market-story"></p><small id="context-source"></small>
+    <h2 id="execution-status"></h2><p id="execution-reason"></p><p id="news-awareness"></p><ul id="execution-checklist"></ul>
+    <span id="primary-status"></span><div id="primary-scenario"></div>
+    <span id="assistant-primary-msg"></span><span id="assistant-sub-msg"></span>
+    <span id="assistant-badge"></span><span id="assistant-confluence-tag"></span><span id="assistant-clock"></span>
+    <span id="assistant-heading"></span>
+    <!-- Legacy panel placeholders (kept so context-panel.js, driver scripts don't crash) -->
+    <div id="amy-dashboard"></div>
+    <div id="amy-assistant"></div>
+    <div id="amy-score-panel"></div>
+    <div id="evidence"></div>
+    <div id="liquidity"></div>
+    <div id="gold-condition"></div>
+    <div id="alternative-scenario"></div>
+    <div id="h1-bias"></div><div id="h1-health"></div>
+    <div id="m15-poi"></div><div id="m15-range"></div>
+    <div id="m15-control"></div><div id="m15-risk"></div>
+    <div id="m5-confirmation"></div><div id="m5-evidence"></div>
+    <div id="driver-tournament-list"></div>
+    <div id="tournament-leader-badge"></div>
+    <div id="bias-table-body"></div>
+    <div id="mapping-alert"></div>
+    <div id="ict-coverage"></div>
+    <!-- Legacy plan compat -->
+    <span id="plan-signal-badge"></span>
+    <span id="plan-anti-chase-pill"></span>
+    <span id="plan-rejection-pill">⚖️ Menunggu Rejection Close</span>
+    <span id="plan-math-zone"></span>
+    <strong id="plan-entry-val"></strong>
+    <strong id="plan-sl-val"></strong>
+    <strong id="plan-tp1-val"></strong>
+    <strong id="plan-tp2-val"></strong>
+    <span id="plan-entry-sub"></span>
+    <span id="plan-sl-sub"></span>
+    <span id="plan-tp1-sub"></span>
+    <span id="plan-tp2-sub"></span>
+    <ul id="plan-reasons-list"></ul>
+    <button id="btn-take-trade"></button>
+    <button id="btn-show-plan-chart"></button>
+    <button id="btn-open-lot-calc"></button>
+    <button id="btn-plan-price-alert"></button>
+    <button id="btn-quick-lot-calc"></button>
+    <div id="plan-pullback-notice"></div>
+    <div id="plan-pretrade-checklist-box"></div>
+    <span id="pretrade-checklist-score"></span>
+    <div id="pretrade-checklist-items"></div>
+    <input type="checkbox" id="chk-pretrade-session">
+    <input type="checkbox" id="chk-pretrade-zone">
+    <input type="checkbox" id="chk-pretrade-liquidity">
+    <input type="checkbox" id="chk-pretrade-rr">
+    <span id="bias-dashboard-status"></span>
+    <div id="amy-bias-matrix"></div>
+    <div id="amy-bias-dashboard-card"></div>
+    <!-- Alarm compat -->
+    <button id="btn-custom-price-alert"></button>
+  </div>
+
+</main>
+
+<footer></footer>
+
+<!-- ── SCRIPTS ── -->
+<script src="../academy/trading-practice/vendor/lightweight-charts.standalone.production.js"></script>
+<script src="js/scanner-visibility-gate.js"></script>
+<script src="js/notification-route-sync.js"></script>
+<script src="js/ict-workspace/dashboard-v2.js"></script>
+<script type="module" src="js/ict-workspace/price-alert-manager.js"></script>
+<script type="module" src="js/ict-workspace/trade-lifecycle-tracker.js"></script>
+<script type="module" src="js/ict-workspace/lot-calculator.js"></script>
+<script type="module" src="js/ict-workspace/app.js"></script>
+<script type="module" src="js/ict-workspace/context-panel.js"></script>
+<script src="../shared/amy-local-assistant.js"></script>
+<script src="../shared/amyfx-universal-nav.js"></script>
+
+<!-- Patch: window.setTab fallback untuk compat scripts yang memanggil setTab -->
+<script>
+if (typeof window.setTab !== 'function') {
+  window.setTab = function(name) {
+    // No-op in dashboard-v2 (tab-less layout)
+    if (name === 'Dashboard') {
+      var chart = document.getElementById('gold-chart-workspace');
+      if (chart) chart.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+}
+</script>
+
+</body></html>

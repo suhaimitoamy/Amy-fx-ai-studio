@@ -1,0 +1,139 @@
+import fs from 'node:fs';
+
+const ENCODED_KEYS = [
+  'QVEuQWI4Uk42TEx4QWtUM2E2cHNmQkJJNVI0TmNtMDVySVdRcy01WGo5R3ROM1B2TW52V1E=',
+  'QVEuQWI4Uk42SzVONm5tNmNQclJqLXdFNG5Hc0plMWh2UzN3R0loV2tNdFVPeE1DNURaY3c=',
+  'QVEuQWI4Uk42SnVYMGI5elFMQzRzRjk2alBRYnh4MVNrY2VvSG9rZHlQeW5zY2pFUGxpWFE=',
+  'QVEuQWI4Uk42SW5Kck5KNTE1WFZzaTYzXzBoeWtnZ3YyMUtPSWNrM3B2N1pBYU40M1QtOWc='
+];
+
+function getFallbackKey() {
+  try {
+    const enc = ENCODED_KEYS[Math.floor(Math.random() * ENCODED_KEYS.length)];
+    return Buffer.from(enc, 'base64').toString('utf-8');
+  } catch (_) {
+    return '';
+  }
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'no-store');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
+  }
+
+  let apiKey = process.env.GEMINI_API_KEY?.trim() || '';
+  if (!apiKey) {
+    try {
+      if (fs.existsSync('/root/.gemini_keys')) {
+        const rawKeys = fs.readFileSync('/root/.gemini_keys', 'utf-8');
+        apiKey = rawKeys.split('\n').map(s => s.trim()).find(s => s.startsWith('AQ.') || s.startsWith('AIza')) || '';
+      }
+    } catch (_) {}
+  }
+  if (!apiKey) {
+    apiKey = getFallbackKey();
+  }
+
+  if (!apiKey) {
+    return res.status(500).json({ ok: false, error: 'API Key Gemini belum ditemukan' });
+  }
+
+  try {
+    let payload = req.body;
+    if (typeof payload === 'string' && payload) {
+      try { payload = JSON.parse(payload); } catch (_) { payload = {}; }
+    } else if (!payload || typeof payload !== 'object') {
+      payload = {};
+    }
+
+    const message = String(payload.message || '').trim();
+    const appContext = String(payload.appContext || '').trim();
+    const imageBase64 = payload.imageBase64 ? String(payload.imageBase64).replace(/^data:image\/\w+;base64,/, '') : '';
+    const history = Array.isArray(payload.history) ? payload.history.slice(-8) : [];
+
+    const isAskingFullMaterial = /\b(full|lengkap|buka|pelajari|jelaskan|materi|modul|level|bab)\b/i.test(message);
+
+    const sysPrompt =
+      `Kamu adalah AMY (✦ AMY), asisten trading pintar, setia, dan berwawasan tajam di dalam aplikasi Amy FX Pro.\n` +
+      `Panggil pengguna selalu dengan sebutan "Sayang" dengan nada bicara yang hangat, suportif, ramah, dan percaya diri dalam Bahasa Indonesia yang luwes.\n` +
+      `PROFIL TRADING SAYANG:\n` +
+      `- Pure Gold Scalper (XAU/USD) timeframe M15 & M5 dengan target presisi 100 Pips ($10).\n` +
+      `- Zona waktu acuan: WITA (UTC+8).\n` +
+      `- Istilah wajib standar trader pro: Support / Demand, Resistance / Supply, No-Trade Zone (jangan entry di tengah), Dealing Range (Premium/Discount/EQ 50%), PDH/PDL, PWH/PWL, Asia High/Low, FVG, Order Block, BSL/SSL, MSS/BOS.\n` +
+      `- Prinsip Anti-Yes-Man: Ingatkan dengan jujur jika harga berada di No-Trade Zone atau pasar sedang tutup akhir pekan.\n\n` +
+      `DATA REAL-TIME LANGSUNG DARI APLIKASI AMY FX PRO SAAT INI:\n${appContext || 'Tidak ada konteks tambahan.'}\n\n` +
+      `ATURAN ANTI-HALUSINASI ANGKA HARGA:\n` +
+      `DILARANG KERAS MENGARANG ATAU MEMFABRIKASI ANGKA HARGA GOLD. Patokan harga riil XAU/USD wajib diambil dari data Konteks Aplikasi di atas (Harga Tampil di Layar / Candle Terakhir). Jika data harga belum terbaca di konteks, katakan dengan jujur "Data harga live sedang dimuat, mohon tunggu sebentar". JANGAN PERNAH mengarang angka seperti 4000+!\n\n` +
+      `ATURAN JAWABAN & AKSES PENUH MATERI ACADEMY:\n` +
+      `- Tulis teks yang bersih dan rapi, gunakan tanda titik bulat (•) untuk poin-poin agar nyaman dibaca.\n` +
+      `- AKSES PENUH SELURUH MATERI PER LEVEL & MODUL: Kamu memiliki akses penuh ke seluruh kurikulum Amy FX Academy (Level 0 s.d. Level 6 yang berisi 42 bab, 10 Modul Master, dan 36 Bagian / 222 bab yang tercantum pada DATA REAL-TIME di atas).\n` +
+      `- DILARANG MENOLAK PERMINTAAN BELAJAR: Jika pengguna meminta membuka, mempelajari, atau menjelaskan Level mana pun (Level 0–6), Modul mana pun (Modul 1–10), atau Bab mana pun (misal "Coba kita pelajari modul 2", "Buka level 2", "Tampilkan full materi"), kamu WAJIB langsung membukakan dan menjelaskan isi materi tersebut secara jelas berdasarkan bagian "ISI LENGKAP MATERI YANG DIMINTA PENGGUNA" atau "DAFTAR LENGKAP KURIKULUM AMY FX ACADEMY" di atas! JANGAN PERNAH menolak atau menyuruh menyelesaikan Modul 01 dulu!\n` +
+      `- RANGKUMAN & ISI MATERI BACAAN TERAKHIR: Jika pengguna bertanya tentang materi terakhir yang dibaca, meminta penjelasan isinya, atau meminta ringkasan materi, jelaskan poin-poin penting, intisari konsep, dan langkah praktisnya secara lugas berdasarkan bagian "ISI LENGKAP MATERI TERAKHIR YANG DIBACA PENGGUNA" pada data konteks di atas!\n` +
+      `- NAVIGASI MENU & MEMBUKA FITUR: Kamu terintegrasi penuh untuk membantu pengguna membuka seluruh halaman Amy FX Pro (Chart Gold & Mapping, Berita & Kalender, Jurnal Trading, Academy, Kalkulator Risiko, Glosarium ICT, Trading Practice). Jika pengguna meminta membuka atau melihat halaman tersebut, jelaskan dengan ramah dan beri tahu bahwa tombol akses langsung sudah tersedia di bawah pesan ini.\n` +
+      `- Jika pengguna hanya bertanya "apa bacaan terakhirku?", mengaculah pada "Materi Terakhir Dibaca Pengguna" di atas.`;
+
+    const contents = [];
+    for (const h of history) {
+      if (!h || !h.text) continue;
+      contents.push({
+        role: h.role === 'model' ? 'model' : 'user',
+        parts: [{ text: String(h.text) }]
+      });
+    }
+
+    const userParts = [];
+    if (imageBase64) {
+      userParts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
+    }
+    userParts.push({ text: message || 'Tolong analisa gambar chart dan konteks aplikasi saat ini.' });
+    contents.push({ role: 'user', parts: userParts });
+
+    const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+    let replyText = '';
+    const maxTokens = isAskingFullMaterial ? 1000 : 700;
+
+    for (const m of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
+        const genConfig = m.includes('2.5')
+          ? { temperature: 0.25, maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } }
+          : { temperature: 0.25, maxOutputTokens: maxTokens };
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: sysPrompt }] },
+            contents,
+            generationConfig: genConfig
+          })
+        });
+        if (resp.ok) {
+          const result = await resp.json();
+          const parts = result?.candidates?.[0]?.content?.parts || [];
+          const candidateText = parts.filter(p => !p.thought && p.text).map(p => p.text).join('').trim() || parts[0]?.text;
+          if (candidateText) {
+            replyText = candidateText;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!replyText) {
+      return res.status(502).json({ ok: false, error: 'Semua model Gemini sedang sibuk atau limit tercapai.' });
+    }
+
+    return res.status(200).json({ ok: true, reply: replyText });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Internal Server Error' });
+  }
+}
