@@ -1,13 +1,14 @@
 {
-  "name": "amy-fx-pro",
+  "name": "amy-fx-ai-studio",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tools/run-tests-sequential.mjs",
-    "preview": "node tools/serve-local.mjs",
-    "serve": "node tools/serve-local.mjs"
+    "dev": "node server.js",
+    "start": "node server.js",
+    "serve": "node server.js",
+    "preview": "node server.js"
   },
   "engines": {
-    "node": "22.x"
+    "node": ">=18.x"
   }
 }
