@@ -1196,6 +1196,44 @@
         border: none !important;
       }
 
+      /* Mobile 360x820 (1080x2460 @ DPR 3) Calibration */
+      @media (max-width: 440px) {
+        #amy-local-panel:not(.amy-bubble-fullscreen) {
+          left: 8px !important;
+          right: 8px !important;
+          width: auto !important;
+          bottom: 80px !important;
+          max-height: calc(100dvh - 102px) !important;
+          border-radius: 18px !important;
+        }
+        #amy-local-panel .prompts {
+          flex-wrap: wrap !important;
+          overflow-x: visible !important;
+          gap: 5px !important;
+          padding: 7px 10px !important;
+        }
+        #amy-local-panel .prompts button {
+          padding: 5px 9px !important;
+          font-size: 11px !important;
+        }
+        #amy-local-panel form {
+          gap: 5px !important;
+          padding: 8px 8px !important;
+        }
+        #amy-local-panel form input {
+          font-size: 13px !important;
+          padding: 8px 9px !important;
+        }
+        .amy-bar-btn {
+          width: 32px !important;
+          height: 32px !important;
+        }
+        .amy-send-btn {
+          width: 34px !important;
+          height: 32px !important;
+        }
+      }
+
       /* FULL LIGHT MODE OVERRIDES (data-amyfx-theme="light" & data-theme="light") */
       :is(html[data-amyfx-theme="light"], html[data-theme="light"]) #amy-local-fab {
         background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%) !important;

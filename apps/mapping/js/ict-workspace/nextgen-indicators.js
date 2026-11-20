@@ -910,6 +910,7 @@ function getTradingDayKey(timeSec) {
   }
 
   return {
+    tf: options.tf || 'M15',
     keyLevels: {
       pdh,
       pdl,

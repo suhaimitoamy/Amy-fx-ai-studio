@@ -369,6 +369,7 @@ window.addEventListener('amyfx:twelvedata-price',event=>{
 });
 window.addEventListener('amyfx:live-price-display',event=>{
   const detail=event?.detail;
+  if(detail?.source==='mapping-sse')return;
   applyLivePrice(Number(detail?.price),Number(detail?.capturedAt));
 });
 function startBrowserLivePriceStream(){
@@ -383,8 +384,13 @@ function startBrowserLivePriceStream(){
     es.onmessage=(event)=>{
       try{
         const data=JSON.parse(event.data);
-        if(data&&Number.isFinite(Number(data.price))){
-          applyLivePrice(Number(data.price),Number(data.timestamp)||Date.now());
+        const liveNum=Number(data?.price);
+        if(data&&Number.isFinite(liveNum)&&liveNum>0){
+          const ts=Number(data.timestamp)||Date.now();
+          applyLivePrice(liveNum,ts);
+          window.dispatchEvent(new CustomEvent('amyfx:live-price-display',{
+            detail:{price:liveNum,capturedAt:ts,source:'mapping-sse'}
+          }));
         }
       }catch(_){}
     };

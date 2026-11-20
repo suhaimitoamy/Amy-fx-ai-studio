@@ -853,7 +853,7 @@
       '<small>Amy FX Pro Trading Assistant</small>' +
       '<div class="prompts"></div>' +
       '<div id="amy-local-messages" aria-live="polite"></div>' +
-      '<form><input aria-label="Pertanyaan untuk Amy" placeholder="Tanya Gold, Jurnal, Lot…" maxlength="2000"><button type="submit">Kirim</button></form>' +
+      '<form><input aria-label="Pertanyaan untuk Amy" placeholder="Tanya XAU/USD..." maxlength="2000"><button type="submit">Kirim</button></form>' +
       '</section>';
     document.body.appendChild(host);
 
