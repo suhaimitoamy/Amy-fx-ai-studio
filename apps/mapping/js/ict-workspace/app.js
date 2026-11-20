@@ -6,8 +6,6 @@ import {mountDisplay,renderAmy,loadDisplay,isGoldMarketOpen} from './ict-present
 import {mountEconomicEventBanner} from './economic-countdown.js';
 import {updateDealingRangeBadge} from './dealing-range-badge.js';
 import {startCockpitSessionPill} from '../engine/market-session-clock.js';
-import {initDetailsPersistence} from './details-persistence.js';
-import {createManualDrawingTool} from '../../../../manual-drawing-tool.js';
 const $=id=>document.getElementById(id);
 const CHART_LAYERS_STORAGE_KEY='amyfx.chart.layers.v1';
 const LAYER_KEYS=Object.keys(DEFAULT_CHART_LAYERS);
@@ -73,19 +71,26 @@ function renderOhlcHud(info){
     `<span class="ohlc-range">Rng $${info.range.toFixed(2)}</span>`;
 }
 
-try{chart=createPriceChart($('chart'),{touchAxes:true});if(typeof renderOhlcHud==='function')chart.setOnCrosshairOHLC?.(renderOhlcHud);}catch{$('chart').textContent='Peta harga belum tersedia. Bukti struktur tetap dapat dibaca.';}
+try{chart=createPriceChart($('chart'),{touchAxes:true,onCrosshairOHLC:renderOhlcHud});}catch{$('chart').textContent='Peta harga belum tersedia. Bukti struktur tetap dapat dibaca.';}
+const drawingToolProxy={repaint:()=>drawingTool?.repaint?.()};
 if(chart?.chart&&chart?.series){
-  try{
-    drawingTool=createManualDrawingTool({
-      container:$('chart'),
-      chart:chart.chart,
-      series:chart.series,
-      getTf:()=>$('timeframe')?.value||'M15',
-      getCandles:()=>lastDrawnCandles
-    });
-  }catch(_){}
+  import('../../../../manual-drawing-tool.js')
+    .catch(()=>import('./manual-drawing-tool.js'))
+    .then(mod=>{
+      if(!mod||typeof mod.createManualDrawingTool!=='function')return;
+      drawingTool=mod.createManualDrawingTool({
+        container:$('chart'),
+        chart:chart.chart,
+        series:chart.series,
+        getTf:()=>$('timeframe')?.value||'M15',
+        getCandles:()=>lastDrawnCandles
+      });
+      if(lastDrawnCandles.length)drawingTool?.setCandles?.(lastDrawnCandles);
+      syncDrawButtonState();
+    })
+    .catch(()=>{});
 }
-const fullscreen=mountChartFullscreen(chart,drawingTool);
+const fullscreen=mountChartFullscreen(chart,drawingToolProxy);
 try{mountEconomicEventBanner();}catch(_){}
 try{startCockpitSessionPill('cockpit-session-pill');}catch(_){}
 $('chart-auto-price')?.addEventListener('click',()=>chart?.autoPrice());
@@ -206,16 +211,12 @@ function updateCandleCountdown(){
   el.classList.toggle('is-urgent',rem<=60);
 }
 
-function tickCandleCountdown(){
-  clearTimeout(countdownTimer);
+function startCountdownTimer(){
+  clearInterval(countdownTimer);
   updateCandleCountdown();
   if(!document.hidden){
-    countdownTimer=setTimeout(tickCandleCountdown,1000);
+    countdownTimer=setInterval(updateCandleCountdown,1000);
   }
-}
-
-function startCountdownTimer(){
-  tickCandleCountdown();
 }
 startCountdownTimer();
 
@@ -548,13 +549,13 @@ $('timeframe').addEventListener('change',()=>{
 });
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){
-    generation++;controller?.abort();clearTimeout(timer);clearTimeout(countdownTimer);
+    generation++;controller?.abort();clearTimeout(timer);clearInterval(countdownTimer);
   }else{
     startCountdownTimer();
     refresh();
   }
 });
-window.addEventListener('pagehide',()=>{generation++;controller?.abort();clearTimeout(timer);clearTimeout(countdownTimer);});
+window.addEventListener('pagehide',()=>{generation++;controller?.abort();clearTimeout(timer);clearInterval(countdownTimer);});
 window.addEventListener('pageshow',event=>{if(event.persisted){startCountdownTimer();refresh();}});
 window.addEventListener('online',refresh);
 window.setTab(new URLSearchParams(location.search).get('route')||location.hash.slice(1)||'Dashboard');
@@ -563,6 +564,8 @@ if(initialStored&&initialStored.length>0){
   const closed=!isGoldMarketOpen(Date.now()/1000);
   raw={candles:filterCandles(initialStored,closed),context:filterCandles(getStoredCandles('H1')||[],closed),tf:$('timeframe')?.value||'M15',degraded:true};
 }
-initDetailsPersistence();
+import('./details-persistence.js')
+  .then(mod=>mod?.initDetailsPersistence?.())
+  .catch(()=>{});
 draw();refresh();
 
