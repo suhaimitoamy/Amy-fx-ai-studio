@@ -1005,7 +1005,7 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
       </div>
     `;
   } else {
-    eventListHtml = '<div class="briefing-empty-events">Tidak ada rilis data USD berdampak tinggi/menengah hari ini. Pergerakan XAU/USD dipandu struktur teknikal Mapping.</div>';
+    eventListHtml = '<div class="briefing-empty-events">Tidak ada rilis USD berdampak tinggi hari ini <button type="button" class="amy-info-btn" data-info-tip="Tidak ada rilis data USD berdampak tinggi/menengah hari ini. Pergerakan XAU/USD dipandu struktur teknikal Mapping." aria-label="Info rilis USD" aria-expanded="false">i</button></div>';
   }
 
   // Playbook reaksi dinamis (ZERO harga hardcoded, ZERO raw markdown *...*)
@@ -1116,15 +1116,12 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
       <article class="briefing-card">
         <div class="card-head">
           <div class="card-title-wrap">
-            <h3 class="card-title">Katalis Sesi Ini &amp; Playbook Reaksi</h3>
+            <h3 class="card-title">Katalis Sesi Ini &amp; Playbook <button type="button" class="amy-info-btn" data-info-tip="Pantau khusus pernyataan pejabat The Fed, arah indeks DXY, dan imbal hasil US 10-Year." aria-label="Info katalis" aria-expanded="false">i</button></h3>
           </div>
           <span class="bias-pill highlight">Kalender USD</span>
         </div>
         <div class="briefing-events-container">${eventListHtml}</div>
         ${scenarioReactionHtml}
-        <div class="card-watch-footer">
-          <strong>Pantau Khusus:</strong> Pernyataan pejabat The Fed, arah indeks DXY, dan imbal hasil US 10-Year.
-        </div>
       </article>
 
       <!-- 3. Komparasi Aset & Jembatan Eksekusi Mapping -->
@@ -1172,13 +1169,10 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
 
         <div class="judas-swing-warning-box ${isReleased ? 'is-post-release' : ''}">
           <div class="judas-swing-head">
-            <span>${isReleased ? 'Fase Pasca-Rilis: Konfirmasi Price Action ICT' : `Protokol Risiko: Waspada Judas Swing (${escapeHtml(eventReleaseTimeWita)})`}</span>
+            <span>${isReleased ? 'Fase Pasca-Rilis · Konfirmasi M5/M15' : `News Lock ±15m · Waspada Judas Swing (${escapeHtml(eventReleaseTimeWita)})`} <button type="button" class="amy-info-btn" data-info-tip="${escapeHtml(isReleased
+              ? 'Data aktual telah rilis. Fase News Lock berakhir — validasi pembentukan Market Structure Shift (MSS) dan Displacement di M5/M15 pada Mapping Cockpit sebelum eksekusi.'
+              : `Disiplin tahan posisi (News Lock) 15 menit sebelum hingga 15 menit sesudah rilis untuk menghindari sapuan likuiditas palsu (Judas Swing) pada BSL (${bridge.bslStr}) maupun SSL (${bridge.sslStr}).`)}" aria-label="Info protokol risiko" aria-expanded="false">i</button></span>
           </div>
-          <p class="judas-swing-body">
-            ${isReleased
-              ? `Data aktual telah rilis. Fase <strong>News Lock berakhir</strong> — validasi pembentukan <em>Market Structure Shift (MSS)</em> dan Displacement di M5/M15 pada Mapping Cockpit sebelum eksekusi.`
-              : `Disiplin <strong>tahan posisi (News Lock)</strong> 15 menit sebelum hingga 15 menit sesudah rilis untuk menghindari sapuan likuiditas palsu (<em>Judas Swing</em>) pada BSL (${escapeHtml(bridge.bslStr)}) maupun SSL (${escapeHtml(bridge.sslStr)}).`}
-          </p>
         </div>
       </article>
 
@@ -1224,7 +1218,7 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
               <ul class="evidence-list">${opposeItems.map(i => `<li>${i}</li>`).join('')}</ul>
             </div>
           </div>
-          ${hasEnergyRisk ? '<p class="energy-risk-note">Catatan Energi: Berita minyak/energi terdeteksi aktif — waspadai efek rambatan ke ekspektasi inflasi.</p>' : ''}
+          ${hasEnergyRisk ? '<p class="energy-risk-note">Risiko Energi Aktif <button type="button" class="amy-info-btn" data-info-tip="Berita minyak/energi terdeteksi aktif — waspadai efek rambatan ke ekspektasi inflasi." aria-label="Info risiko energi" aria-expanded="false">i</button></p>' : ''}
         </div>
       </details>
     </div>
