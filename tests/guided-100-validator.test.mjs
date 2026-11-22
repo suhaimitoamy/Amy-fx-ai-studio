@@ -5,7 +5,11 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 const ROOT = process.cwd();
-const TP_DIR = path.join(ROOT, 'apps', 'academy', 'trading-practice');
+const candidateTpDirs = [
+  path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'academy', 'trading-practice'),
+  path.join(ROOT, 'apps', 'academy', 'trading-practice')
+];
+const TP_DIR = candidateTpDirs.find((d) => fs.existsSync(d)) || candidateTpDirs[0];
 const DATA_PATH = path.join(TP_DIR, 'assets', 'data', 'guided-exercises.json');
 const SESSION_PATH = path.join(TP_DIR, 'assets', 'js', 'guided-session.js');
 

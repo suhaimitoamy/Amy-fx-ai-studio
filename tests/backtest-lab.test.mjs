@@ -206,8 +206,11 @@ test('guided-exercises.json: all 100 exercises map to valid Academy 6-Level less
   assert.equal(guided.exercises.length, 100);
 
   const validIds = new Set();
+  const academyDataDir = fs.existsSync(path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'academy', 'data'))
+    ? path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'academy', 'data')
+    : path.join(ROOT, 'apps', 'academy', 'data');
   for (const f of ['levels-1-2.js', 'levels-3-4.js', 'levels-5-6.js']) {
-    const src = fs.readFileSync(path.join(ROOT, 'apps', 'academy', 'data', f), 'utf8');
+    const src = fs.readFileSync(path.join(academyDataDir, f), 'utf8');
     for (const m of src.matchAll(/id:\s*'([^']+)'/g)) validIds.add(m[1]);
   }
 
