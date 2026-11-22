@@ -201,9 +201,9 @@ test('practice-analytics: word-boundary OB regex, null-R guard, and equity/drawd
   assert.equal(stats.equityCurve.length, 5); // Awal + 4 closed trades
 });
 
-test('guided-exercises.json: all 60 exercises map to valid Academy 6-Level lesson IDs', () => {
+test('guided-exercises.json: all 100 exercises map to valid Academy 6-Level lesson IDs', () => {
   const guided = JSON.parse(fs.readFileSync(path.join(TP_DIR, 'assets', 'data', 'guided-exercises.json'), 'utf8'));
-  assert.equal(guided.exercises.length, 60);
+  assert.equal(guided.exercises.length, 100);
 
   const validIds = new Set();
   for (const f of ['levels-1-2.js', 'levels-3-4.js', 'levels-5-6.js']) {

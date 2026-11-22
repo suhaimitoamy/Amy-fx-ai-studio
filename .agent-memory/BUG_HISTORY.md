@@ -634,3 +634,13 @@ Pro368 commit9bbca50 added Sniper ID, Fib78.6% and quickScalpRR0.8 metadata with
 ## 2026-09-30 — Pro382 six-driver evaluation
 
 Diperbaiki: enam referensi tanpa detector, metadata Sniper palsu, Fib tidak dihitung, ensemble tanpa quorum, Shield tanpa risk policy, Rapid tanpa sesi/exit. Regresi menemukan crossing pada gap M5 dan lifecycle melewatkan candle berikutnya; diperbaiki. Statistik model baru memakai realized R, termasuk BE gap/time exit, dan mengecualikan outcome ambigu.
+
+## 2026-11-22 — Global Anti-SwipeRefresh Guard, Amy Live Scroll & Compact Orb, Video Reel Scroll Fix
+
+- **Root Cause**: Android `SwipeRefreshLayout.canChildScrollUp()` inspects `webView.canScrollVertically(-1)` (root document `window.scrollY > 0`). Whenever Amy Live, Video Reel (`is-reel-open`), Jurnal video feed (`is-video-feed-open`), open `<dialog>` sheets, or Backtest inner containers were swiped downward while root `scrollY === 0` (or locked by `overflow: hidden !important`), Android intercepted the touch gesture and triggered native Pull-to-Refresh (`↻`) instead of scrolling up inside the container.
+- **Fix**:
+  - Created global `apps/shared/amyfx-scroll-guard.js` auto-loaded across all pages via `apps/shared/amyfx-theme-controller.js` (`ensureScrollGuardScript()`).
+  - Maintains ref-counted overlay locks (`lock`/`unlock`), adds `amy-ptr-buffer` so short pages can hold `window.scrollY = 2`, nudges `window.scrollY` to `>= 2` on lock and `touchstart` inside any inner scrollable container/overlay/Backtest route, blocks browser/PWA PTR only when `scrollTop <= 0 && dy > 0` or on non-scrollable overlay chrome, calls optional native `window.Android?.setPullToRefreshEnabled?.(false/true)` hooks, and strictly exempts Chart Gold in `apps/mapping/`.
+  - Removed root `overflow: hidden !important` from `html/body.is-reel-open` (`styles.css`) and `html/body.is-video-feed-open` (`apps/journal/style.css`), and wired `AmyScrollGuard.lock/unlock('video-reel')` in `app.js` without modifying any Video features.
+  - Upgraded Amy Live (`apps/shared/amy-gemini-live-bridge.js`): fixed `#amy-local-messages` flex scroll CSS (`min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; touch-action: pan-y;`), added smart auto-scroll (`isMessagesNearBottom`), and added hysteretic `.amy-orb-compact` mode in fullscreen (collapses `#amy-orb-hero` from ~245px to 61px when reading scrolled-up text, Dark & Light Mode parity).
+- **Verification**: `node --test tests/amyfx-scroll-guard.test.mjs` (8/8 pass), `node --check`, Chromium 390×844 Dark/Light live Playwright check (0 console/page errors, `scrollY: 2` on open, `scrollY: 0` restored on close, Mapping Chart Gold exempted).
