@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'amy_mapping_logs', 'amy_mapping_analyses', 'amy_mapping_setups',
       'amy_mapping_lifecycle_v4', 'amy_mapping_active_pointer_v4',
       'amy_entry_watch_state_v3', 'amy_recent_projects', 'amy_saved_code',
-      'amy_journal_entries', 'amy_mapping_notified',
+      'amy_journal_entries', 'amy_mapping_notified', 'amy_indicator_favorites',
       'tradingLibraryManager.journals.v1', 'tradingLibraryManager.notes.v1',
       'tradingLibraryManager.items.v1', 'amy_sim_positions_v1',
       'amy_sim_cashflows_v1', 'amy_daily_loss_guard_v1',
