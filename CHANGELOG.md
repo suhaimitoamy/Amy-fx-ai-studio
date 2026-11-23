@@ -1,3 +1,49 @@
+## 2.0.0-pro.472
+
+- feat(notification): Penggantian menyeluruh notifikasi HP Android & foreground Web Amy FX Pro ke sistem POI Mapping Cockpit (M5 & M15 FVG & OB).
+- feat(notification): Format notifikasi presisi terstandarisasi:
+  * Disentuh / Sentuh 50% CE: `[🔴/🟢] [BUY/SELL] [FVG/OB] [M5/M15] · [Disentuh / Sentuh 50% CE] ($low–$high)` dengan detail `CE | SL | TP1 | TP2`.
+  * Update hasil siklus penuh: `🎯 TP1 BEP ✓`, `👑 TP2 DOL ★` (+100 Pips), dan `🛡️ Jebol SL ✕` lengkap dengan rentang zona & maks gerak.
+- fix(notification): Menonaktifkan total sinyal engine lama (`PULLBACK SELL/BUY CISD` dan `amy_entry_v3`) agar tidak bentrok.
+- feat(anti-spam): Deduplikasi ketat per `zoneId + eventType` (1 zona POI hanya kirim 1x saat disentuh/sentuh CE, dan 1x saat outcome resolusi). Tetap mematuhi filter pasar tutup akhir pekan (`isWeekendClosure`) dan perlindungan `🛡️ NEWS LOCK`.
+
+## 2.0.0-pro.471
+
+- fix(notification): Filter anti-spam background Android & web menonaktifkan alert counter-trend pullback (PULLBACK SELL/BUY CISD) agar notifikasi hanya murni berfokus pada sinyal Trend Utama, Peluru Utama Grade A+, dan siklus POI FVG/OB M5 (CE, TP1 BEP, TP2 DOL, SL).
+
+## 2.0.0-pro.470
+
+- feat(notification): Integrasi notifikasi Android real-time untuk siklus penuh POI Mapping (Opsi A & B): sentuh CE dengan denting bel emas kristal, pengawalan TP1 BEP, panen TP2 DOL 100 pips, dan batas disiplin SL dengan anti-spam deduplication serta normalisasi risiko aman.
+
+## 2.0.0-pro.469
+
+- fix(android-filechooser): Penyempurnaan `onShowFileChooser` di `MainActivity.kt` dengan wrapper `Intent.createChooser`, toleransi ekstraksi URI `clipData` & `data.data`, perbaikan CSS overlay `font-size: 100px` (mencegah shadow DOM button 0x0 di WebView), dan pemisahan role button `mt5DropLabel` untuk responsivitas sentuh instan di Android.
+
+## 2.0.0-pro.468
+
+- fix(journal-ocr): Adopsi pemilih file touch overlay dari AI Studio (`.jl-mt5-file-overlay` mengisi penuh label dengan `inset: 0`) & toleransi MIME type gambar Android MediaStore/DocumentsContract (`application/octet-stream` atau MIME kosong).
+- feat(journal-ocr): Direct Client-Side Gemini Vision Engine dengan rotasi multi-key Base64 terlindungi (`gemini-2.5-flash`, `gemini-flash-latest`) untuk memproses OCR MT5 langsung dari HP tanpa terhambat Vercel 404.
+
+## 2.0.0-pro.467
+
+- fix(journal-ocr): Perbaikan aktivasi file picker screenshot MT5 pada Android WebView dengan menambahkan click listener langsung pada `mt5DropLabel` dan clipboard paste handler.
+- feat(journal-ocr): Direct Client-Side Gemini Vision Engine dengan rotasi multi-key (`gemini-2.5-flash`, `gemini-flash-latest`) untuk memproses OCR MT5 langsung dari HP tanpa dependensi Vercel proxy.
+- fix(api): Perbaikan model name pada `/api/mt5-scan` ke model resmi Gemini 2.5 Flash serta sinkronisasi endpoint ke repo Vercel `Amy-fx`.
+
+## 2.0.0-pro.466
+
+- feat(journal): MT5 Screenshot OCR Auto-Import (`api/mt5-scan.js`, `apps/journal/mt5-scan-ui.js`, `apps/shared/mt5-ocr-parser.js`) melalui Gemini Vision API dengan konversi pips XAU/USD, Cent USC handling, shift jam broker ke WITA, dan deduplikasi cerdas.
+- feat(scroll): Global Android Pull-to-Refresh Scroll Guard (`apps/shared/amyfx-scroll-guard.js`) dimuat otomatis via theme controller untuk mengamankan dialog, overlay, dan chart tanpa mengganggu Chart Gold di Mapping.
+- feat(practice): Guided Practice 100 Kasus (`guided-exercises.json`, `guided-practice.js`, `guided-session.js`) lengkap dengan kalkulasi penguasaan pilar ICT dan validasi bebas bocoran masa depan.
+
+## 2.0.0-pro.465
+
+- feat(sync): Cloud Sync via GitHub Private Repo (`apps/shared/github-cloud-sync.js`) untuk backup & restore Jurnal, Catatan Pribadi, Profil Simulasi, Daily Loss Guard, progres Academy, & Bookmark Replay.
+- feat(security): Eksklusi ketat token PAT & media blob biner dari payload snapshot JSON, validasi format repo/branch, dan penanganan token lokal terisolasi.
+- feat(sync): Conflict Guard anti-timpa data lintas perangkat dengan pengecekan `updatedAt` & `deviceId`, serta auto-sync latar belakang dengan debounce 5 detik.
+- feat(ui): Grup pengaturan vertikal baru "Cloud Sync (GitHub)" di halaman Pengaturan selaras Dark & Light mode.
+- test(sync): Unit test lengkap 6/6 suite di `tests/github-cloud-sync.test.mjs`.
+
 ## 2.0.0-pro.373
 
 - feat(mapping): Implementasi logika displacement FVG murni TradingView ICT Concepts [amygmgo] dengan filter ketebalan minimum (celah mikro < 0.8 point otomatis ditolak) dan kalkulasi 50% Consequent Encroachment (CE).

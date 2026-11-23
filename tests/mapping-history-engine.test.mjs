@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import {
+const engineRelPath = existsSync(resolve(import.meta.dirname, '../app/src/main/assets/apps/mapping/js/ict-workspace/mapping-history-engine.js'))
+  ? '../app/src/main/assets/apps/mapping/js/ict-workspace/mapping-history-engine.js'
+  : '../apps/mapping/js/ict-workspace/mapping-history-engine.js';
+
+const {
   HISTORY_STORAGE_KEY,
   MAX_RETENTION_MS,
   witaDateKey,
@@ -15,7 +21,7 @@ import {
   mergeHistoryState,
   filterByRange,
   summarizePoiStats
-} from '../apps/mapping/js/ict-workspace/mapping-history-engine.js';
+} = await import(engineRelPath);
 
 const BASE_SEC = Math.floor(Date.UTC(2026, 3, 15, 4, 0, 0) / 1000); // 12:00 WITA
 const NOW_MS = (BASE_SEC + 10 * 900) * 1000;
@@ -299,4 +305,51 @@ test('loadHistoryState & saveHistoryState: round-trips cleanly and handles corru
   store.set(HISTORY_STORAGE_KEY, '{corrupt-json');
   const recovered = loadHistoryState(mockStorage);
   assert.deepEqual(recovered, createEmptyHistoryState());
+});
+
+test('recordLivePoiProgress: dispatches notifications on CE touch, TP1, TP2, and SL with strict anti-spam deduplication', () => {
+  const plan = {
+    side: 'SELL',
+    tf: 'M5',
+    kind: 'FVG',
+    area: { low: 3592.0, high: 3601.0, ce: 3596.5 },
+    sl: 3601.5,
+    tp1: 3588.5,
+    tp2: 3582.5
+  };
+
+  let state = createEmptyHistoryState();
+
+  // 1. Initial touch at CE -> dispatches CE_TOUCH alert with gold chime
+  let r = recordLivePoiProgress({ state, plans: [plan], livePrice: 3596.5, nowMs: NOW_MS });
+  assert.equal(r.changed, true);
+  assert.equal(r.alerts.length, 1);
+  assert.equal(r.alerts[0].type, 'CE_TOUCH');
+  assert.match(r.alerts[0].title, /🔴 SELL FVG M5 · Sentuh 50% CE/);
+  assert.match(r.alerts[0].body, /CE \$3596\.50 \| SL \$3601\.50 \| TP1 \$3588\.50 \| TP2 \$3582\.50/);
+  assert.equal(r.alerts[0].sound, 'gold');
+  state = r.state;
+
+  // 2. Next tick still near CE -> NO duplicate alert (anti-spam)
+  r = recordLivePoiProgress({ state, plans: [plan], livePrice: 3596.7, nowMs: NOW_MS + 2000 });
+  assert.equal(r.alerts.length, 0, 'must not re-trigger CE alert on noisy ticks');
+
+  // 3. Price runs to TP1 -> dispatches TP1_HIT alert
+  r = recordLivePoiProgress({ state, plans: [plan], livePrice: 3588.0, nowMs: NOW_MS + 10000 });
+  assert.equal(r.alerts.length, 1);
+  assert.equal(r.alerts[0].type, 'TP1_HIT');
+  assert.match(r.alerts[0].title, /🎯 TP1 BEP ✓ · SELL FVG M5/);
+  assert.match(r.alerts[0].body, /BEP/);
+  state = r.state;
+
+  // 4. Price ticks again around TP1 -> NO duplicate TP1 alert
+  r = recordLivePoiProgress({ state, plans: [plan], livePrice: 3587.5, nowMs: NOW_MS + 12000 });
+  assert.equal(r.alerts.length, 0, 'must not re-trigger TP1 alert');
+
+  // 5. Price reaches TP2 DOL -> dispatches TP2_HIT alert
+  r = recordLivePoiProgress({ state, plans: [plan], livePrice: 3582.0, nowMs: NOW_MS + 25000 });
+  assert.equal(r.alerts.length, 1);
+  assert.equal(r.alerts[0].type, 'TP2_HIT');
+  assert.match(r.alerts[0].title, /👑 TP2 DOL ★ · SELL FVG M5/);
+  assert.match(r.alerts[0].body, /100 Pips/);
 });

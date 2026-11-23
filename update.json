@@ -1,23 +1,25 @@
 {
-  "apk_url": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.453/AmyFX-Pro-latest.apk",
+  "apk_url": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.472/AmyFX-Pro-latest.apk",
   "changelog": [
-    "✦ Fix Anti-Menguap POI Setup Buy & Sell: Implementasi Lifecycle 3-Fase (Waiting -> In-Play/Terjemput -> Terminal). Setup dan zona chart tetap terkunci dan dipantau saat harga menyentuh entry sampai TP/SL tercapai.",
-    "✦ Mode Posisi Berjalan (In-Play): Status badge dan SOP Box memandu posisi aktif saat sedang menguji zona tanpa mereset atau menghilangkan kartu.",
-    "✦ Preservasi POI Tested Chart: Kotak FVG dan Order Block yang sedang diuji harga tetap digambar di canvas dengan garis putus-putus dan tidak langsung terhapus mendadak."
+    "✦ Notifikasi POI Mapping Cockpit (M5 & M15): Ganti seluruh notifikasi sinyal engine lama dengan event POI FVG & OB (M5 + M15) murni.",
+    "✦ Format Presisi: Menampilkan arah (BUY/SELL), kind (FVG/OB), timeframe (M5/M15), rentang harga zona, CE 50%, SL, TP1, dan TP2.",
+    "✦ Pengawalan Siklus Hasil Penuh: Update otomatis untuk 🎯 TP1 BEP ✓, 👑 TP2 DOL ★ (+100 Pips), dan 🛡️ Jebol SL ✕.",
+    "✦ Deduplikasi Ketat & Anti-Spam: 1 zona POI hanya mengirim 1x saat disentuh/sentuh CE dan 1x saat hasil akhir."
   ],
-  "downloadUrl": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.453/AmyFX-Pro-latest.apk",
+  "downloadUrl": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.472/AmyFX-Pro-latest.apk",
   "enabled": true,
   "force_update": false,
-  "latest_version_code": 950453,
-  "latest_version_name": "2.0.0-pro.453",
+  "latest_version_code": 950472,
+  "latest_version_name": "2.0.0-pro.472",
   "mandatory": false,
-  "releaseDate": "2026-11-17",
+  "releaseDate": "2026-11-23",
   "release_notes": [
-    "✦ Fix Anti-Menguap POI Setup Buy & Sell: Implementasi Lifecycle 3-Fase (Waiting -> In-Play/Terjemput -> Terminal). Setup dan zona chart tetap terkunci dan dipantau saat harga menyentuh entry sampai TP/SL tercapai.",
-    "✦ Mode Posisi Berjalan (In-Play): Status badge dan SOP Box memandu posisi aktif saat sedang menguji zona tanpa mereset atau menghilangkan kartu.",
-    "✦ Preservasi POI Tested Chart: Kotak FVG dan Order Block yang sedang diuji harga tetap digambar di canvas dengan garis putus-putus dan tidak langsung terhapus mendadak."
+    "✦ Notifikasi POI Mapping Cockpit (M5 & M15): Ganti seluruh notifikasi sinyal engine lama dengan event POI FVG & OB (M5 + M15) murni.",
+    "✦ Format Presisi: Menampilkan arah (BUY/SELL), kind (FVG/OB), timeframe (M5/M15), rentang harga zona, CE 50%, SL, TP1, dan TP2.",
+    "✦ Pengawalan Siklus Hasil Penuh: Update otomatis untuk 🎯 TP1 BEP ✓, 👑 TP2 DOL ★ (+100 Pips), dan 🛡️ Jebol SL ✕.",
+    "✦ Deduplikasi Ketat & Anti-Spam: 1 zona POI hanya mengirim 1x saat disentuh/sentuh CE dan 1x saat hasil akhir."
   ],
-  "version": "2.0.0-pro.453",
-  "versionCode": 950453,
-  "sha256": "019994fbd86f1ed523ff6e6687ffa94bc50c20113e36a4f22ebb67b123023461"
+  "version": "2.0.0-pro.472",
+  "versionCode": 950472,
+  "sha256": "2df79939c3a3f1b0a609fc70222d133d6178816cdb9ad3ac6fd5f237a8e0c496"
 }
