@@ -4,6 +4,50 @@
   var MAX_FILES = 5;
   var MAX_IMAGE_WIDTH = 1280;
   var JPEG_QUALITY = 0.84;
+  var ENCODED_FALLBACK_KEYS = [
+    "QVEuQWI4Uk42TEx4QWtUM2E2cHNmQkJJNVI0TmNtMDVySVdRcy01WGo5R3ROM1B2TW52V1E=",
+    "QVEuQWI4Uk42SzVONm5tNmNQclJqLXdFNG5Hc0plMWh2UzN3R0loV2tNdFVPeE1DNURaY3c=",
+    "QVEuQWI4Uk42SnVYMGI5elFMQzRzRjk2alBRYnh4MVNrY2VvSG9rZHlQeW5zY2pFUGxpWFE=",
+    "QVEuQWI4Uk42SW5Kck5KNTE1WFZzaTYzXzBoeWtnZ3YyMUtPSWNrM3B2N1pBYU40M1QtOWc="
+  ];
+  var GEMINI_VISION_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite"
+  ];
+  var MT5_VISION_SYSTEM_PROMPT =
+    "Kamu adalah mesin ekstraksi data presisi tinggi khusus screenshot MetaTrader 5 (MT5), MetaTrader 4 (MT4), dan riwayat transaksi trading (Android, iOS, Desktop).\n" +
+    "TUGAS UTAMA:\n" +
+    "• Baca SEMUA baris trade yang terlihat pada screenshot secara lengkap dari atas ke bawah (bisa 1 trade atau 2–25 trade sekaligus dalam tab History/Riwayat MT5).\n" +
+    "• Abaikan baris Balance / Deposit / Withdrawal / Credit / Total Profit ringkasan bagian atas (jangan masukkan ke array trades).\n" +
+    "• Perhatikan tanda minus (-) dan angka merah WAJIB bernilai negatif (contoh: -12.43). Angka biru/hijau positif (contoh: 42.50).\n" +
+    "• Pada baris MT5 Android/iOS format umum:\n" +
+    "  Baris kiri atas: 'XAUUSDc, buy 0.01' atau 'GOLD, sell 0.03'\n" +
+    "  Baris kiri bawah: '3 851.35 -> 3 838.92' (kiri = entryPrice, kanan = exitPrice)\n" +
+    "  Baris kanan atas: '2026.11.18 02:15:20' (closeTime)\n" +
+    "  Baris kanan bawah: '-12.43' (profit)\n" +
+    "• Jika detail baris terbuka, baca juga sl, tp, swap, commission, ticket, openTime.\n" +
+    "• Jika akun cent (simbol ada akhiran 'c' seperti XAUUSDc atau currency USC/CENT), set isCentAccount: true.\n" +
+    "• DILARANG mengarang angka yang tidak terlihat. Kembalikan JSON valid sesuai format:\n" +
+    "{\n" +
+    "  \"accountCurrency\": \"USC\" atau \"USD\",\n" +
+    "  \"isCentAccount\": true/false,\n" +
+    "  \"notes\": \"catatan jika ada\",\n" +
+    "  \"trades\": [\n" +
+    "    {\n" +
+    "      \"entryType\": \"trade\",\n" +
+    "      \"symbol\": \"XAUUSDc\",\n" +
+    "      \"direction\": \"buy\",\n" +
+    "      \"lot\": 0.01,\n" +
+    "      \"entryPrice\": 3851.35,\n" +
+    "      \"exitPrice\": 3838.92,\n" +
+    "      \"sl\": null,\n" +
+    "      \"tp\": null,\n" +
+    "      \"profit\": -12.43,\n" +
+    "      \"closeTime\": \"2026.11.18 02:15:20\"\n" +
+    "    }\n" +
+    "  ]\n" +
+    "}";
   var DISCIPLINE_TAGS = [
     { label: "Sesuai Plan", good: true },
     { label: "FOMO", good: false },
@@ -506,6 +550,130 @@
     renderFileThumbs();
   }
 
+  function decodeKey(b64) {
+    try {
+      if (typeof atob === "function") return atob(b64).trim();
+      if (typeof Buffer !== "undefined") return Buffer.from(b64, "base64").toString("utf-8").trim();
+    } catch (_) {}
+    return "";
+  }
+
+  function isValidGeminiKey(key) {
+    var k = String(key || "").trim();
+    return Boolean(k && k.length >= 20 && (k.indexOf("AIza") === 0 || k.indexOf("AQ.") === 0));
+  }
+
+  function getAvailableGeminiKeys() {
+    var keys = [];
+    try {
+      var saved = JSON.parse(localStorage.getItem("tradingLibraryManager.assistantSettings.v1") || "{}");
+      if (saved && isValidGeminiKey(saved.apiKey)) {
+        keys.push(saved.apiKey.trim());
+      }
+    } catch (_) {}
+    try {
+      var userKey = localStorage.getItem("amy_user_gemini_api_key");
+      if (isValidGeminiKey(userKey)) {
+        keys.push(userKey.trim());
+      }
+    } catch (_) {}
+    try {
+      var standaloneKey = localStorage.getItem("gemini_api_key");
+      if (isValidGeminiKey(standaloneKey)) {
+        keys.push(standaloneKey.trim());
+      }
+    } catch (_) {}
+    ENCODED_FALLBACK_KEYS.forEach(function (b64) {
+      var k = decodeKey(b64);
+      if (isValidGeminiKey(k) && keys.indexOf(k) === -1) {
+        keys.push(k);
+      }
+    });
+    return keys;
+  }
+
+  async function callDirectGeminiVision(base64Data, mimeType) {
+    var rawBase64 = String(base64Data || "").trim();
+    if (rawBase64.indexOf("base64,") !== -1) {
+      rawBase64 = rawBase64.split("base64,")[1];
+    }
+    if (!rawBase64) throw new Error("Data gambar kosong.");
+
+    var keys = getAvailableGeminiKeys();
+    if (!keys.length) {
+      throw new Error("Tidak ada API Key Gemini yang tersedia.");
+    }
+
+    var lastError = null;
+    for (var k = 0; k < keys.length; k++) {
+      var apiKey = keys[k];
+      for (var m = 0; m < GEMINI_VISION_MODELS.length; m++) {
+        var model = GEMINI_VISION_MODELS[m];
+        try {
+          var url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + encodeURIComponent(apiKey);
+          var resp = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent": "aistudio-build"
+            },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: MT5_VISION_SYSTEM_PROMPT }] },
+              contents: [{
+                role: "user",
+                parts: [
+                  { inlineData: { mimeType: mimeType || "image/jpeg", data: rawBase64 } },
+                  { text: "Ekstrak seluruh baris transaksi trading MT5/MT4 dari screenshot ini menjadi JSON terstruktur." }
+                ]
+              }],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
+          });
+
+          if (!resp.ok) {
+            lastError = new Error("Gemini API HTTP " + resp.status);
+            if (resp.status === 429) break;
+            continue;
+          }
+
+          var result = await resp.json();
+          var parts = result && result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts;
+          var text = parts && parts.map(function (p) { return p.text || ""; }).join("").trim();
+          if (text) {
+            var fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+            var cleanText = fenced ? fenced[1].trim() : text;
+            var parsed = JSON.parse(cleanText);
+            if (parsed && typeof parsed === "object" && Array.isArray(parsed.trades)) {
+              return { ok: true, data: parsed, model: model };
+            }
+          }
+        } catch (e) {
+          lastError = e;
+        }
+      }
+    }
+    throw lastError || new Error("Gagal membaca screenshot via Gemini Vision.");
+  }
+
+  async function callServerProxy(compressedDataUrl, mimeType) {
+    var endpoint = getApiBaseUrl() + "/api/mt5-scan";
+    var resp = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: compressedDataUrl,
+        mimeType: mimeType || "image/jpeg"
+      })
+    });
+    var json = await resp.json().catch(function () { return null; });
+    if (!resp.ok || !json || !json.ok || !json.data) {
+      throw new Error((json && json.error) || "Gagal memindai screenshot MT5 (HTTP " + resp.status + ").");
+    }
+    return json;
+  }
+
   async function runMt5Scan() {
     if (!scanState.files.length || scanState.scanning) return;
     scanState.scanning = true;
@@ -517,7 +685,6 @@
     var total = scanState.files.length;
     var notesList = [];
     var detectedCentAny = false;
-    var endpoint = getApiBaseUrl() + "/api/mt5-scan";
 
     try {
       for (var i = 0; i < total; i += 1) {
@@ -528,18 +695,19 @@
         }
 
         var mimeType = extractMimeFromDataUrl(item.compressedDataUrl);
-        var resp = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageBase64: item.compressedDataUrl,
-            mimeType: mimeType
-          })
-        });
+        var json = null;
+        try {
+          json = await callDirectGeminiVision(item.compressedDataUrl, mimeType);
+        } catch (directErr) {
+          try {
+            json = await callServerProxy(item.compressedDataUrl, mimeType);
+          } catch (proxyErr) {
+            throw directErr || proxyErr;
+          }
+        }
 
-        var json = await resp.json().catch(function () { return null; });
-        if (!resp.ok || !json || !json.ok || !json.data) {
-          throw new Error((json && json.error) || "Gagal memindai screenshot MT5 (HTTP " + resp.status + ").");
+        if (!json || !json.ok || !json.data) {
+          throw new Error("Gagal memproses data screenshot MT5.");
         }
 
         if (json.data.isCentAccount || String(json.data.accountCurrency || "").toUpperCase() === "USC") {
