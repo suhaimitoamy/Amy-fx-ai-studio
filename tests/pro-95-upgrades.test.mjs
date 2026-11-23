@@ -23,6 +23,8 @@ function loadAcademyCurriculum() {
     'apps/academy/data/levels-1-2.js',
     'apps/academy/data/levels-3-4.js',
     'apps/academy/data/levels-5-6.js',
+    'apps/academy/data/mastery-advanced.js',
+    'apps/academy/data/mastery-deep-enrichment.js',
     'apps/academy/data/curriculum.js'
   ]) {
     vm.runInContext(fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8'), ctx, { filename: rel });
