@@ -304,12 +304,12 @@ function setupRefreshButtons() {
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
       btn.disabled = true;
-      btn.textContent = 'Memuat…';
+      btn.classList.add('is-loading');
       try {
         await fn();
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Perbarui';
+        btn.classList.remove('is-loading');
       }
     });
   };

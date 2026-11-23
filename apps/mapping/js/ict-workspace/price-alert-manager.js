@@ -804,22 +804,26 @@ export function unlockAlertAudio() {
 }
 
 /* ── Sync Active Count Badge on Mapping & Beranda Buttons ── */
+const HOME_ALARM_ICON_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
+
 export function syncAlertButtonBadges() {
   if (typeof document === 'undefined') return;
   ensureAlertStyles();
   const activeCount = getAlerts().filter(a => a.status === 'ACTIVE').length;
   const targets = [
-    { id: 'btn-chart-custom-price-alert', baseText: 'Pasang Alarm' },
-    { id: 'home-chart-alert', baseText: '🔔 Pasang Alarm' }
+    { id: 'btn-chart-custom-price-alert', baseHtml: `${HOME_ALARM_ICON_SVG}<span>Alarm</span>`, isHtml: true },
+    { id: 'home-chart-alert', baseHtml: `${HOME_ALARM_ICON_SVG}<span>Alarm</span>`, isHtml: true }
   ];
-  for (const { id, baseText } of targets) {
+  for (const { id, baseHtml, isHtml } of targets) {
     const btn = document.getElementById(id);
     if (!btn) continue;
     btn.setAttribute('data-active-alerts', String(activeCount));
     if (activeCount > 0) {
-      btn.innerHTML = `${baseText}<span class="amyfx-alarm-btn-count" aria-label="${activeCount} alarm aktif">${activeCount}</span>`;
+      btn.innerHTML = `${baseHtml}<span class="amyfx-alarm-btn-count" aria-label="${activeCount} alarm aktif">${activeCount}</span>`;
+    } else if (isHtml) {
+      btn.innerHTML = baseHtml;
     } else {
-      btn.textContent = baseText;
+      btn.textContent = baseHtml;
     }
   }
 }
