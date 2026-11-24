@@ -5,7 +5,11 @@ import vm from 'node:vm';
 import path from 'node:path';
 
 const ROOT = process.cwd();
-const TP_DIR = path.join(ROOT, 'apps', 'academy', 'trading-practice');
+const candidateTpDirs = [
+  path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'academy', 'trading-practice'),
+  path.join(ROOT, 'apps', 'academy', 'trading-practice')
+];
+const TP_DIR = candidateTpDirs.find((d) => fs.existsSync(d)) || candidateTpDirs[0];
 
 function loadBrowserModules(files) {
   const sandbox = {
@@ -209,9 +213,13 @@ test('guided-exercises.json: all 100 exercises map to valid Academy 6-Level less
   const academyDataDir = fs.existsSync(path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'academy', 'data'))
     ? path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'academy', 'data')
     : path.join(ROOT, 'apps', 'academy', 'data');
-  for (const f of ['levels-1-2.js', 'levels-3-4.js', 'levels-5-6.js']) {
+  for (const f of ['level-0.js', 'levels-1-2.js', 'levels-3-4.js', 'levels-5-6.js', 'mastery-advanced.js', 'curriculum.js']) {
     const src = fs.readFileSync(path.join(academyDataDir, f), 'utf8');
     for (const m of src.matchAll(/id:\s*'([^']+)'/g)) validIds.add(m[1]);
+    for (const m of src.matchAll(/'([a-z0-9-]+)':\s*'([a-z0-9-]+)'/g)) {
+      validIds.add(m[1]);
+      validIds.add(m[2]);
+    }
   }
 
   for (const ex of guided.exercises) {
@@ -262,7 +270,12 @@ function loadStorageEnv(initialStore = {}) {
     const code = fs.readFileSync(path.join(TP_DIR, 'assets', 'js', rel), 'utf8');
     vm.runInContext(code, sandbox, { filename: rel });
   }
-  const simCode = fs.readFileSync(path.join(ROOT, 'apps', 'shared', 'account-sim-engine.js'), 'utf8');
+  const candidateSimPaths = [
+    path.join(ROOT, 'app', 'src', 'main', 'assets', 'apps', 'shared', 'account-sim-engine.js'),
+    path.join(ROOT, 'apps', 'shared', 'account-sim-engine.js')
+  ];
+  const simPath = candidateSimPaths.find((p) => fs.existsSync(p)) || candidateSimPaths[0];
+  const simCode = fs.readFileSync(simPath, 'utf8');
   vm.runInContext(simCode, sandbox, { filename: 'account-sim-engine.js' });
   return { sandbox, store };
 }
