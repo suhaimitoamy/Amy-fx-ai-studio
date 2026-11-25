@@ -35,6 +35,11 @@ const CALENDAR_ENDPOINTS = [
 ];
 const CALENDAR_CACHE_KEY = 'amy_economic_calendar_v1';
 const NEWS_CACHE_KEY = 'amyfx.assistant.news.v1';
+const MACRO_CACHE_KEY = 'amy_macro_snapshot_v1';
+const MACRO_MEMORY_TTL_MS = 45 * 1000;
+const MACRO_CACHE_MAX_AGE_MS = 15 * 60 * 1000;
+let latestMacroSnapshot = null;
+let macroFetchInFlight = null;
 
 const COUNTRY_FLAGS = {
   USD: '🇺🇸', EUR: '🇪🇺', GBP: '🇬🇧', JPY: '🇯🇵',
@@ -314,7 +319,7 @@ function setupRefreshButtons() {
     });
   };
   bindRefresh('btn-refresh-sentiment', async () => {
-    await Promise.allSettled([loadCalendar(true), loadNews(true)]);
+    await Promise.allSettled([fetchMacroSnapshot(true), loadCalendar(true), loadNews(true)]);
     await loadSentiment(false, true);
   });
   bindRefresh('btn-refresh-news', () => loadNews(false));
@@ -502,12 +507,27 @@ function extractActualForEvent(ev, newsItems) {
     keywords.push(title);
   }
 
+  const evDateMs = ev.date ? new Date(ev.date).getTime() : NaN;
+  const nowMs = Date.now();
+  if (Number.isFinite(evDateMs) && evDateMs > nowMs + 60 * 1000) return null;
+
+  const expectPct = /%/.test(String(ev.forecast || ev.previous || ''));
+  const expectScale = /[KkMmBb]$/.test(String(ev.forecast || ev.previous || '').trim());
+  const isPlausibleVal = (rawVal) => {
+    const v = String(rawVal || '').trim();
+    if (!v) return false;
+    if (expectPct && !v.includes('%')) return false;
+    if (expectScale && !/[KkMmBb]$/.test(v)) return false;
+    return true;
+  };
+
   for (const item of newsItems) {
-    if (item.time && ev.date) {
+    if (item.time && Number.isFinite(evDateMs)) {
       const itemDate = new Date(item.time).getTime();
-      const evDate = new Date(ev.date).getTime();
-      if (Number.isFinite(itemDate) && Number.isFinite(evDate)) {
-        const diffHours = Math.abs(itemDate - evDate) / 3600000;
+      if (Number.isFinite(itemDate)) {
+        // News reporting an actual release cannot arrive more than 5 min BEFORE scheduled release
+        if (itemDate < evDateMs - 5 * 60 * 1000) continue;
+        const diffHours = (itemDate - evDateMs) / 3600000;
         if (diffHours > 18) continue;
       }
     }
@@ -518,14 +538,11 @@ function extractActualForEvent(ev, newsItems) {
     if (!matchedKw) continue;
 
     const p1 = raw.match(/(?:[•\-\*\s]|^)(?:Aktual|Actual|Saat\s*ini|Current|Sebenarnya|Hasil|Result|Rilis)\s*[:=]?\s*([+-]?\d+(?:[\.,]\d+)?[%KkMmBb]?)/im);
-    if (p1?.[1]) return p1[1].trim();
+    if (p1?.[1] && isPlausibleVal(p1[1])) return p1[1].trim();
 
     const kwEsc = matchedKw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const p2 = new RegExp(`${kwEsc}[^\\n\\r:]*[:=]?\\s*([+-]?\\d+(?:[\\.,]\\d+)?[%KkMmBb]?)`, 'i').exec(raw);
-    if (p2?.[1]) return p2[1].trim();
-
-    const p3 = raw.match(/(?:tercatat|keluar|sebesar|mencapai)\s*([+-]?\d+(?:[\.,]\d+)?[%KkMmBb]?)/i);
-    if (p3?.[1]) return p3[1].trim();
+    const p2 = new RegExp(`${kwEsc}[^\\n\\r:]*[:=]\\s*([+-]?\\d+(?:[\\.,]\\d+)?[%KkMmBb]?)`, 'i').exec(raw);
+    if (p2?.[1] && isPlausibleVal(p2[1])) return p2[1].trim();
   }
   return null;
 }
@@ -546,8 +563,11 @@ function enrichCalendarEventsWithNews(events, newsItems) {
   if (!Array.isArray(events) || events.length === 0) return;
   const items = Array.isArray(newsItems) && newsItems.length > 0 ? newsItems : getCachedNewsItems();
   if (!items.length) return;
+  const nowMs = Date.now();
 
   for (const ev of events) {
+    const evMs = Date.parse(ev.date);
+    if (Number.isFinite(evMs) && evMs > nowMs + 60 * 1000) continue;
     if (!ev.actual || ev.actual === '—' || ev.actual === '--') {
       const ext = extractActualForEvent(ev, items);
       if (ext) {
@@ -641,79 +661,247 @@ function computeMappingBridgeState(liveCtx) {
   };
 }
 
-// ─── Kompas Fundamental Renderer ─────────────────────────
+// ─── Live Macro Snapshot Fetcher (DXY, US10Y, VIX, Gold, Silver) ───
+function readCachedMacroSnapshot() {
+  try {
+    const raw = localStorage.getItem(MACRO_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.quotes) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function fetchMacroSnapshot(force = false) {
+  const now = Date.now();
+  if (!force && latestMacroSnapshot && (now - (latestMacroSnapshot._fetchedAt || 0)) < MACRO_MEMORY_TTL_MS) {
+    return latestMacroSnapshot;
+  }
+  if (!force && macroFetchInFlight) {
+    return macroFetchInFlight;
+  }
+
+  const runFetch = (async () => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 5200) : null;
+    try {
+      const url = `${API_BASE}/macro-snapshot${force ? '?force=1' : ''}`;
+      const res = await fetch(url, {
+        cache: 'no-store',
+        signal: controller ? controller.signal : undefined
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && data.quotes) {
+        const availableCount = Number(data.availableCount ?? data.liveCount ?? 0);
+        const snap = {
+          ...data,
+          availableCount,
+          _fetchedAt: Date.now(),
+          _sourceMode: availableCount > 0 ? 'live' : 'offline'
+        };
+        latestMacroSnapshot = snap;
+        try { localStorage.setItem(MACRO_CACHE_KEY, JSON.stringify(snap)); } catch (_) {}
+        return snap;
+      }
+    } catch (_) {
+      // Fall back honestly to localStorage cache if still within 15m freshness window
+      const cached = latestMacroSnapshot || readCachedMacroSnapshot();
+      if (cached && cached.quotes) {
+        const ageMs = Date.now() - (cached._fetchedAt || Date.parse(cached.updatedAt || cached.fetchedAt) || 0);
+        return {
+          ...cached,
+          _sourceMode: ageMs > MACRO_CACHE_MAX_AGE_MS ? 'stale' : 'cache'
+        };
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    return {
+      ok: false,
+      liveCount: 0,
+      quotes: { dxy: null, us10y: null, vix: null, gold: null, silver: null },
+      _fetchedAt: Date.now(),
+      _sourceMode: 'offline'
+    };
+  })();
+
+  if (!force) {
+    macroFetchInFlight = runFetch;
+    runFetch.finally(() => {
+      if (macroFetchInFlight === runFetch) macroFetchInFlight = null;
+    });
+  }
+  return runFetch;
+}
+
+// ─── Kompas Institutional SVG Helpers ────────────────────
+function renderCompassGaugeSvg(score, tone, counts, activeFactorCount) {
+  const clamped = Math.max(-100, Math.min(100, Number(score) || 0));
+  // Map -100..+100 onto -90deg..+90deg needle rotation around (100, 96)
+  const angleDeg = (clamped / 100) * 86;
+  const scoreSign = clamped > 0 ? '+' : '';
+  const scoreDisplay = activeFactorCount > 0 ? `${scoreSign}${clamped}` : '—';
+  const toneColor = tone === 'bull'
+    ? 'var(--km-bull)'
+    : (tone === 'bear'
+      ? 'var(--km-bear)'
+      : (tone === 'lock' ? 'var(--km-lock)' : 'var(--km-gold)'));
+
+  const bullCount = Number(counts?.bull || 0);
+  const bearCount = Number(counts?.bear || 0);
+  const neutralCount = Number(counts?.neutral || 0);
+
+  return `
+    <div class="km-gauge" aria-label="Skor Makro Kompas ${escapeHtml(scoreDisplay)} dari rentang -100 sampai +100">
+      <svg class="km-gauge__svg" viewBox="0 0 200 124" fill="none" role="img" aria-hidden="true">
+        <defs>
+          <linearGradient id="kmGaugeGrad" x1="18" y1="92" x2="182" y2="92" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#ef4444" stop-opacity="0.85" />
+            <stop offset="48%" stop-color="#94a3b8" stop-opacity="0.45" />
+            <stop offset="52%" stop-color="#94a3b8" stop-opacity="0.45" />
+            <stop offset="100%" stop-color="#22c55e" stop-opacity="0.85" />
+          </linearGradient>
+        </defs>
+        <!-- Outer hairline reference arc -->
+        <path d="M 18 92 A 82 82 0 0 1 182 92" stroke="currentColor" stroke-opacity="0.12" stroke-width="10" stroke-linecap="round" />
+        <!-- Active semantic spectrum arc -->
+        <path d="M 18 92 A 82 82 0 0 1 182 92" stroke="url(#kmGaugeGrad)" stroke-width="4" stroke-linecap="round" />
+        <!-- Precision calibration ticks (-100, -50, 0, +50, +100) -->
+        <line x1="18" y1="92" x2="26" y2="92" stroke="currentColor" stroke-opacity="0.32" stroke-width="1.2" />
+        <line x1="42" y1="34" x2="48" y2="40" stroke="currentColor" stroke-opacity="0.28" stroke-width="1.2" />
+        <line x1="100" y1="10" x2="100" y2="19" stroke="currentColor" stroke-opacity="0.45" stroke-width="1.5" />
+        <line x1="158" y1="34" x2="152" y2="40" stroke="currentColor" stroke-opacity="0.28" stroke-width="1.2" />
+        <line x1="182" y1="92" x2="174" y2="92" stroke="currentColor" stroke-opacity="0.32" stroke-width="1.2" />
+        <!-- Compass needle -->
+        <g transform="rotate(${angleDeg.toFixed(1)} 100 92)">
+          <line x1="100" y1="92" x2="100" y2="24" stroke="${toneColor}" stroke-width="2.4" stroke-linecap="round" />
+          <circle cx="100" cy="24" r="2.6" fill="${toneColor}" />
+        </g>
+        <!-- Center pivot -->
+        <circle cx="100" cy="92" r="5" fill="var(--km-surface)" stroke="${toneColor}" stroke-width="2.2" />
+        <!-- Scale end labels with crisp clearance below pivot -->
+        <text x="18" y="118" class="km-gauge__scale" text-anchor="start">BEAR</text>
+        <text x="100" y="118" class="km-gauge__scale" text-anchor="middle">0</text>
+        <text x="182" y="118" class="km-gauge__scale" text-anchor="end">BULL</text>
+      </svg>
+      <div class="km-gauge__readout">
+        <span class="km-gauge__score tone-${escapeHtml(tone)}">${escapeHtml(scoreDisplay)}</span>
+        <span class="km-gauge__tally">
+          <b class="tone-bull">${bullCount} Bull</b> · <b class="tone-bear">${bearCount} Bear</b> · <span>${neutralCount} Netral</span>
+        </span>
+      </div>
+    </div>
+  `;
+}
+
+function renderSparklineSvg(values, tone) {
+  const pts = Array.isArray(values)
+    ? values.map(Number).filter(Number.isFinite)
+    : [];
+  if (pts.length < 2) {
+    return `<svg class="km-spark km-spark--empty" viewBox="0 0 64 22" fill="none" aria-hidden="true"><line x1="2" y1="11" x2="62" y2="11" stroke="currentColor" stroke-opacity="0.18" stroke-dasharray="2 2" stroke-width="1.2" /></svg>`;
+  }
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const span = max - min || 1;
+  const w = 64;
+  const h = 22;
+  const padY = 3;
+  const coords = pts.map((v, idx) => {
+    const x = (idx / (pts.length - 1)) * (w - 4) + 2;
+    const y = h - padY - ((v - min) / span) * (h - padY * 2);
+    return [x, y];
+  });
+  const lineD = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+  const areaD = `${lineD} L${coords[coords.length - 1][0].toFixed(1)} ${h} L${coords[0][0].toFixed(1)} ${h} Z`;
+  const stroke = tone === 'bull'
+    ? 'var(--km-bull)'
+    : (tone === 'bear'
+      ? 'var(--km-bear)'
+      : (tone === 'warn' ? 'var(--km-gold)' : 'var(--km-muted)'));
+  const last = coords[coords.length - 1];
+
+  return `
+    <svg class="km-spark" viewBox="0 0 ${w} ${h}" fill="none" aria-hidden="true">
+      <path d="${areaD}" fill="${stroke}" fill-opacity="0.11" />
+      <path d="${lineD}" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2" fill="${stroke}" />
+    </svg>
+  `;
+}
+
+function formatAgendaCountdown(dateIso, nowMs, hasActual) {
+  if (hasActual) return { text: 'Rilis', cls: 'is-done' };
+  const ms = Date.parse(dateIso);
+  if (!Number.isFinite(ms)) return { text: 'Jadwal NY', cls: '' };
+  const diffMin = Math.round((ms - nowMs) / 60000);
+  if (diffMin >= -15 && diffMin <= 30) {
+    return {
+      text: diffMin > 0 ? `LOCK ${diffMin}m` : 'LOCK RILIS',
+      cls: 'is-lock'
+    };
+  }
+  if (diffMin < -15) {
+    return { text: 'Menunggu Act', cls: 'is-passed' };
+  }
+  if (diffMin < 60) {
+    return { text: `${diffMin}m lagi`, cls: 'is-soon' };
+  }
+  const h = Math.floor(diffMin / 60);
+  const m = diffMin % 60;
+  if (h < 24) {
+    return { text: m > 0 ? `${h}j ${m}m` : `${h}j lagi`, cls: '' };
+  }
+  const d = Math.floor(h / 24);
+  return { text: `${d}h lagi`, cls: '' };
+}
+
+// ─── Kompas Fundamental Renderer (100% Real-Data Grounded) ───
 async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
   const container = document.getElementById('sentiment-content');
   const statusEl = document.getElementById('sentiment-status');
   if (!container) return;
 
+  const engine = window.AmyKompasEngine;
+  if (!engine || typeof engine.computeKompasState !== 'function') return;
+
   const now = new Date();
+  const nowMs = now.getTime();
   const timeZone = 'Asia/Makassar';
   const nyTimeZone = 'America/New_York';
   const dateStrWita = now.toLocaleDateString('id-ID', {
-    timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    timeZone, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
   });
   const timeStrWita = now.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }) + ' WITA';
 
-  const cached = getCachedCalendar();
-  const events = (calendarEvents.length > 0 ? calendarEvents : (cached?.events || []));
+  // Gather calendar + news already available
+  const cachedCal = getCachedCalendar();
+  const events = (calendarEvents.length > 0 ? calendarEvents : (cachedCal?.events || []));
   const usdEvents = events.filter(e => String(e.country || '').toUpperCase() === 'USD');
-  const hasEvents = usdEvents.length > 0;
   const newsItems = getCachedNewsItems();
+  const goldNews = newsItems.filter(isNewsRelevantForGold);
 
-  // Filter event USD hari ini berdasarkan kalender New York
+  // Filter today's USD events (NY date) + upcoming USD events
   const todayNY = now.toLocaleDateString('en-CA', { timeZone: nyTimeZone });
-  const todayUsd = usdEvents.filter(e => {
-    const d = new Date(e.date);
-    return Number.isFinite(d.getTime()) && d.toLocaleDateString('en-CA', { timeZone: nyTimeZone }) === todayNY;
-  });
-  todayUsd.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const todayUsd = usdEvents
+    .filter(e => {
+      const d = new Date(e.date);
+      return Number.isFinite(d.getTime()) && d.toLocaleDateString('en-CA', { timeZone: nyTimeZone }) === todayNY;
+    })
+    .sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
   enrichCalendarEventsWithNews(todayUsd, newsItems);
 
-  const importantToday = todayUsd.filter(e => {
-    const imp = String(e.impact || '').toLowerCase();
-    return imp === 'high' || imp === 'medium';
-  });
+  const upcomingUsd = usdEvents
+    .filter(e => {
+      const ms = Date.parse(e.date);
+      return Number.isFinite(ms) && ms >= nowMs;
+    })
+    .sort((a, b) => (Date.parse(a.date) || 0) - (Date.parse(b.date) || 0));
 
-  // Prioritaskan event yang SUDAH rilis (ada actual) & paling berdampak, lalu upcoming terdekat
-  const rankedToday = [...(importantToday.length ? importantToday : todayUsd)]
-    .sort((a, b) => scoreEventImportance(b, now.getTime()) - scoreEventImportance(a, now.getTime()));
-  const mainEvent = rankedToday[0] || usdEvents.find(e => {
-    const t = new Date(e.date).getTime();
-    return Number.isFinite(t) && t >= now.getTime();
-  }) || null;
-
-  const nfpEvent = todayUsd.find(e => /non-farm|nonfarm|payroll/i.test(e.title));
-  const unempEvent = todayUsd.find(e => /unemployment rate/i.test(e.title));
-  const wageEvent = todayUsd.find(e => /hourly earnings/i.test(e.title));
-  const isLaborPackage = Boolean(nfpEvent && (unempEvent || wageEvent));
-
-  const evTime = mainEvent ? new Date(mainEvent.date).getTime() : 0;
-  const isTimePassed = Number.isFinite(evTime) && evTime > 0 && now.getTime() > evTime;
-  const minutesSinceScheduled = isTimePassed ? Math.floor((now.getTime() - evTime) / 60000) : 0;
-  const eventAnalysis = analyzeMacroEvent(mainEvent);
-  const isReleased = Boolean(eventAnalysis?.isReleased);
-
-  // Bukti berita Gold (Geopolitik & Energi)
-  const goldNews = newsItems.filter(isNewsRelevantForGold);
-  const geopoliticsItems = goldNews.filter(n => {
-    const t = `${n.text || ''} ${n.textOriginal || ''}`.toLowerCase();
-    return /\b(perang|war|geopolit|serangan|attack|israel|iran|hormuz|russia|rusia|ukraina|ukraine|putin|rudal|missile|nuklir|nuclear|timur tengah|middle east)\b/i.test(t);
-  });
-  const deescalationItems = goldNews.filter(n => {
-    const t = `${n.text || ''} ${n.textOriginal || ''}`.toLowerCase();
-    return /\b(gencatan senjata|ceasefire|kesepakatan damai|peace deal|de-eskalasi|deescalation)\b/i.test(t) &&
-      !/\b(ended|berakhir|gagal|tolak|no nuclear talks|tidak ada pembicaraan)\b/i.test(t);
-  });
-  const energyItems = goldNews.filter(n => {
-    const t = `${n.text || ''} ${n.textOriginal || ''}`.toLowerCase();
-    return /\b(minyak|oil|brent|opec|energi|energy|hormuz)\b/i.test(t);
-  });
-  const hasGeopolitics = geopoliticsItems.length > 0;
-  const isDeescalation = deescalationItems.length > 0;
-  const hasEnergyRisk = energyItems.length > 0;
-
-  // Live Context untuk Jembatan Mapping
+  // Read live Mapping Cockpit context
   let liveCtx = null;
   try {
     liveCtx = window.AmyMarketContext || window.parent?.AmyMarketContext || null;
@@ -724,503 +912,305 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
   } catch (_) {}
 
   const isCtxStale = forceCtxRefresh || !liveCtx || !liveCtx.price || (liveCtx.source?.M15 && (Date.now() / 1000 - Number(liveCtx.source.M15) > 900));
-  if (isCtxStale) {
-    try {
-      const res = await fetch(`${API_BASE}/scalper-setups`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.context) {
-          liveCtx = data.context;
-          try { localStorage.setItem('amyfx.market-context.v1', JSON.stringify(liveCtx)); } catch (_) {}
-        }
-      }
-    } catch (_) {}
+
+  // Fetch live macro quotes + fresh scalper context in parallel when needed
+  const [macroRes, ctxRes] = await Promise.allSettled([
+    fetchMacroSnapshot(forceCtxRefresh),
+    isCtxStale
+      ? fetch(`${API_BASE}/scalper-setups`, { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
+      : Promise.resolve(null)
+  ]);
+
+  const macroSnap = macroRes.status === 'fulfilled' && macroRes.value
+    ? macroRes.value
+    : { ok: false, liveCount: 0, quotes: {}, _sourceMode: 'offline' };
+
+  if (ctxRes.status === 'fulfilled' && ctxRes.value?.context) {
+    liveCtx = ctxRes.value.context;
+    try { localStorage.setItem('amyfx.market-context.v1', JSON.stringify(liveCtx)); } catch (_) {}
   }
 
   const bridge = computeMappingBridgeState(liveCtx);
-  const cacheAgeMs = cached?.savedAt ? Date.now() - cached.savedAt : 0;
-  const isStaleCache = cacheAgeMs > 24 * 60 * 60 * 1000;
+  const k = engine.computeKompasState({
+    macroQuotes: macroSnap.quotes || {},
+    usdTodayEvents: todayUsd,
+    usdUpcomingEvents: upcomingUsd,
+    goldNews,
+    liveCtx,
+    bridge,
+    nowMs
+  });
 
-  let syncBadgeHtml = '';
-  if (!hasEvents) {
-    syncBadgeHtml = '<span class="briefing-sync-badge sync-disconnected">Kalender Offline</span>';
-  } else if (isCalendarLive) {
-    syncBadgeHtml = '<span class="briefing-sync-badge sync-live">Kalender Live</span>';
-  } else if (isStaleCache) {
-    syncBadgeHtml = '<span class="briefing-sync-badge sync-cache">Cache Usang &gt;24j</span>';
-  } else {
-    syncBadgeHtml = '<span class="briefing-sync-badge sync-cache">Cache Lokal</span>';
+  // Honest sync label
+  const liveQuotesCount = [
+    macroSnap.quotes?.dxy,
+    macroSnap.quotes?.us10y,
+    macroSnap.quotes?.vix,
+    macroSnap.quotes?.gold
+  ].filter(q => q && Number.isFinite(Number(q.price))).length;
+
+  let syncText = 'Feed Offline';
+  let syncTone = 'offline';
+  if (macroSnap._sourceMode === 'live' && liveQuotesCount > 0) {
+    syncText = `Live Makro · ${liveQuotesCount}/4 Feed`;
+    syncTone = 'live';
+  } else if (macroSnap._sourceMode === 'cache' && liveQuotesCount > 0) {
+    syncText = `Cache Makro · ${liveQuotesCount}/4`;
+    syncTone = 'cache';
+  } else if (macroSnap._sourceMode === 'stale' && liveQuotesCount > 0) {
+    syncText = 'Cache >15m';
+    syncTone = 'cache';
   }
-
-  // ── Sintesis Single Source of Truth (Kompas Utama + Scorecard + Komparasi USD vs Gold) ──
-  let usdScore = 'Menanti Data';
-  let yieldScore = 'Menanti Sinyal';
-  let riskScore = hasGeopolitics && !isDeescalation ? 'Risk-Off · Geopolitik Aktif' : 'Seimbang · Menanti Katalis';
-  let goldBias = 'Netral — Menanti Konfirmasi';
-  let goldBiasClass = 'mixed';
-  let conclusionBias = 'WAIT / NETRAL';
-  let horizonStr = 'Sesi Berjalan';
-  let dom1Title = mainEvent ? mainEvent.title : 'Dinamika USD & Suku Bunga';
-  let dom1Reason = eventAnalysis?.scenarioDesc || 'Pasar menunggu rilis data ekonomi AS untuk mengonfirmasi arah likuiditas berikutnya.';
-  let mainScenario = 'Disiplin menunggu reaksi struktur Dealing Range sebelum eksekusi.';
-  let confirmCondition = 'Konfirmasi MSS / Displacement valid di M5/M15.';
-  let invalidationCondition = 'Sapuan whipsaw dua arah atau kejutan berita mendadak.';
-  let mappingBridgeText = 'Gunakan struktur teknikal di Mapping Cockpit sebagai pemicu entri utama.';
-
-  // Komparasi Aset (100% sinkron dengan goldBiasClass — ZERO kontradiksi!)
-  let usdDualStatus = 'Konsolidasi';
-  let usdDualTone = 'neutral';
-  let usdDualText = 'Dolar AS bergerak terbatas sambil menunggu kejelasan katalis makro sesi New York.';
-  let goldDualStatus = 'Menanti Katalis';
-  let goldDualTone = 'neutral';
-  let goldDualText = 'XAU/USD bergerak mengikuti struktur teknikal Dealing Range sampai data resmi menggeser ekspektasi.';
-
-  if (!hasEvents) {
-    usdScore = 'Data Belum Tersedia';
-    yieldScore = 'Menunggu Sinyal';
-    riskScore = 'Tanpa Katalis Terjadwal';
-    goldBias = 'Belum Cukup Data Makro';
-    goldBiasClass = 'insufficient';
-    conclusionBias = 'TEKNIKAL MURNI · TANPA RILIS BESAR';
-    horizonStr = 'Mode Teknikal';
-    dom1Title = 'Ketiadaan Katalis Makro AS';
-    dom1Reason = 'Belum ada jadwal data ekonomi AS yang tersinkronisasi; pergerakan sepenuhnya dipandu struktur teknikal.';
-    mainScenario = 'Fokus pada struktur Dealing Range, OB/FVG, dan sapuan likuiditas di Mapping Cockpit.';
-    confirmCondition = 'MSS valid di M5 selaras bias M15.';
-    invalidationCondition = 'Munculnya breaking news geopolitik atau pernyataan mendadak The Fed.';
-    mappingBridgeText = 'Tanpa rilis data tier-1 terjadwal, ikuti sepenuhnya bias dan zona POI aktif pada Mapping Cockpit.';
-    usdDualStatus = 'Netral';
-    usdDualText = 'Belum ada rilis data AS yang mengubah arah Dolar secara fundamental hari ini.';
-    goldDualStatus = 'Ikuti Teknikal';
-    goldDualText = 'Fokus penuh pada peta Dealing Range dan zona POI aktif di Mapping Cockpit.';
-  } else if (eventAnalysis?.bias === 'BULLISH_BOUNCE') {
-    usdScore = isReleased ? 'Melemah Pasca Rilis' : 'Cenderung Melemah';
-    yieldScore = 'Mereda · Mendukung Emas';
-    goldBias = isReleased ? 'Bullish Bounce (Pasca Data)' : 'Condong Bullish';
-    goldBiasClass = 'bullish';
-    conclusionBias = isReleased ? 'DUKUNGAN BULLISH · PANTAU KONFIRMASI M5' : 'BIASKAN BUY ON DIPS (MENJELANG RILIS)';
-    horizonStr = isReleased ? 'Pasca-Rilis Data' : 'Menjelang Rilis';
-    dom1Title = isReleased ? `Rilis Aktual: ${mainEvent.title} (${mainEvent.actual})` : `Proyeksi: ${mainEvent.title}`;
-    dom1Reason = eventAnalysis.scenarioDesc;
-    mainScenario = bridge.isBearBreakdown
-      ? 'Fundamental memberi ruang pantulan, tetapi teknikal masih Breakdown Bearish — tunggu MSS Bullish M5 sebelum Buy, atau tunggu pullback ke Supply jika tren turun bertahan.'
-      : 'Cari peluang Buy on Dips di zona Demand/Diskon setelah sapuan SSL dan konfirmasi MSS M5.';
-    confirmCondition = isReleased
-      ? `Data aktual (${mainEvent.actual}) menekan DXY dan harga membentuk MSS Bullish di M5.`
-      : `Actual rilis lebih lemah dari perkiraan (${mainEvent.forecast || 'konsensus'}).`;
-    invalidationCondition = 'Harga gagal bertahan di atas demand kunci atau data AS lanjutan berbalik kuat.';
-    mappingBridgeText = bridge.isBearBreakdown
-      ? 'Hati-hati: fundamental cenderung mendukung pantulan Gold, tetapi struktur M15 sedang Breakdown Bearish. Jangan tangkap pisau jatuh — wajib tunggu MSS Bullish M5 atau pantau pullback Supply di Mapping.'
-      : 'Cari konfirmasi entri BUY di area Diskon PD Array (OB/FVG Bullish) setelah SSL tersapu di Mapping Cockpit.';
-    usdDualStatus = isReleased ? 'Melemah Pasca Rilis' : 'Cenderung Melemah';
-    usdDualTone = 'bear';
-    usdDualText = isReleased
-      ? `Rilis aktual ${mainEvent.title} (${mainEvent.actual} vs ${mainEvent.forecast || mainEvent.previous || 'konsensus'}) menekan daya tarik Dolar AS dan yield Treasury.`
-      : `Ekspektasi pendinginan pada ${mainEvent.title} berpotensi menekan Dolar AS jika terkonfirmasi saat rilis.`;
-    goldDualStatus = isReleased ? 'Ruang Pantulan Bullish' : 'Condong Bullish';
-    goldDualTone = 'bull';
-    goldDualText = bridge.isBearBreakdown
-      ? 'Pelemahan USD memberi bantalan pantulan untuk Gold, namun tetap wajib selaraskan dengan struktur M15 yang masih Breakdown di Mapping.'
-      : 'Pelemahan USD bersama dukungan safe haven memberi ruang reli bagi XAU/USD menuju likuiditas atas.';
-  } else if (eventAnalysis?.bias === 'BEARISH_PRESSURE') {
-    usdScore = isReleased ? 'Menguat Pasca Rilis' : 'Cenderung Kuat';
-    yieldScore = 'Menekan Emas';
-    goldBias = isReleased ? 'Tekanan Bearish (Pasca Data)' : 'Condong Bearish';
-    goldBiasClass = 'bearish';
-    conclusionBias = isReleased ? 'TEKANAN BEARISH · SELL ON RALLY DI SUPPLY' : 'WASPADA SELL ON RALLY (MENJELANG RILIS)';
-    horizonStr = isReleased ? 'Pasca-Rilis Data' : 'Menjelang Rilis';
-    dom1Title = isReleased ? `Rilis Aktual: ${mainEvent.title} (${mainEvent.actual})` : `Proyeksi: ${mainEvent.title}`;
-    dom1Reason = eventAnalysis.scenarioDesc;
-    mainScenario = 'Fokus mencari setup Sell on Rally di zona Supply / Premium PD Array setelah pullback — hindari mengejar Sell di harga bawah.';
-    confirmCondition = isReleased
-      ? `Data aktual (${mainEvent.actual}) menjaga DXY kuat dan retest Supply M15/M5 ditolak.`
-      : `Actual rilis lebih kuat dari perkiraan (${mainEvent.forecast || 'konsensus'}).`;
-    invalidationCondition = 'Eskalasi geopolitik mendadak atau penembusan struktur atas (Bear Invalid) di Mapping.';
-    mappingBridgeText = bridge.isBearBreakdown
-      ? 'Fundamental dan teknikal selaras Bearish (Breakdown). Jangan kejar Sell di dasar — tunggu pullback ke zona Supply/FVG terdekat di Mapping Cockpit.'
-      : 'Fokus Sell on Rally di zona Premium PD Array (Bearish OB/FVG) sesudah BSL tersapu di Mapping Cockpit.';
-    usdDualStatus = isReleased ? 'Menguat Pasca Rilis' : 'Cenderung Kuat';
-    usdDualTone = 'bull';
-    usdDualText = isReleased
-      ? `Rilis aktual ${mainEvent.title} (${mainEvent.actual} vs ${mainEvent.forecast || mainEvent.previous || 'konsensus'}) menjaga ketahanan Dolar AS dan yield obligasi.`
-      : `Proyeksi solid pada ${mainEvent.title} menopang Dolar AS dan menahan ekspektasi pemangkasan suku bunga agresif.`;
-    goldDualStatus = 'Tekanan Bearish';
-    goldDualTone = 'bear';
-    goldDualText = hasGeopolitics && !isDeescalation
-      ? 'Penguatan Dolar menekan Gold, namun tensi geopolitik aktif tetap menjadi bantalan yang bisa memicu pullback tajam.'
-      : 'Kekuatan Dolar dan yield membatasi kenaikan emas non-yielding; fokus disiplin mencari Sell saat pullback ke zona Supply.';
-  } else if (isLaborPackage && !isReleased) {
-    usdScore = 'Siaga Volatilitas NFP';
-    yieldScore = 'Menanti Data NFP';
-    goldBias = 'Siaga Volatilitas Tinggi (Pra-NFP)';
-    goldBiasClass = 'mixed';
-    conclusionBias = 'NEWS LOCK · MENJELANG PAKET DATA NFP';
-    horizonStr = 'Pra-Rilis NFP';
-    dom1Title = 'Paket Ketenagakerjaan AS (NFP · Unemployment · Upah)';
-    dom1Reason = 'Rilis gabungan tenaga kerja AS adalah katalis tier-1 paling volatil bagi XAU/USD; hindari eksekusi sebelum angka resmi keluar.';
-    mainScenario = 'Tahan posisi baru 15 menit sebelum hingga 15 menit sesudah rilis NFP, lalu ikuti arah konfirmasi pasca-sweep di Mapping.';
-    confirmCondition = 'Terbentuk MSS dan Displacement bersih di M5 setelah spike awal mereda.';
-    invalidationCondition = 'Pergerakan whipsaw dua arah tanpa penutupan candle yang jelas.';
-    mappingBridgeText = 'Gunakan protokol News Lock menjelang NFP. Eksekusi baru dibuka setelah likuiditas BSL/SSL tersapu dan MSS M5 terbentuk.';
-    usdDualStatus = 'Siaga NFP';
-    usdDualTone = 'neutral';
-    usdDualText = 'Dolar AS menunggu angka resmi NFP dan Tingkat Pengangguran untuk menentukan arah tren berikutnya.';
-    goldDualStatus = 'Siaga Volatilitas';
-    goldDualTone = 'neutral';
-    goldDualText = 'Spread dan spike XAU/USD biasanya melebar drastis saat NFP; tunggu pasar memilih arah pasca-rilis.';
-  } else {
-    usdScore = 'Konsolidasi';
-    yieldScore = 'Bergerak Terbatas';
-    goldBias = 'Campuran / Menanti Katalis';
-    goldBiasClass = 'mixed';
-    conclusionBias = 'WAIT / NETRAL';
-    horizonStr = 'Sesi Berjalan';
-    usdDualStatus = 'Konsolidasi';
-    usdDualTone = 'neutral';
-    usdDualText = `Pasar masih menunggu kepastian arah dari ${mainEvent ? mainEvent.title : 'katalis makro AS'} sebelum mendorong DXY satu arah.`;
-    goldDualStatus = 'Campuran / Range';
-    goldDualTone = 'neutral';
-    goldDualText = 'Belum ada kejutan fundamental yang kuat; ikuti disiplin struktur teknikal dan zona POI pada Mapping Cockpit.';
-  }
-
-  // Time-aware adjustment jika jadwal mainEvent sudah lewat tapi actual belum tersedia
-  if (!isReleased && isTimePassed && minutesSinceScheduled >= 5 && hasEvents && mainEvent) {
-    const evTimeStr = new Date(mainEvent.date).toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' });
-    horizonStr = `Pasca-Rilis (${minutesSinceScheduled}m lalu)`;
-    if (goldBiasClass === 'mixed' || goldBiasClass === 'insufficient') {
-      conclusionBias = 'EVALUASI REAKSI PASAR';
-      mainScenario = 'Amati respon harga pasca-rilis di Mapping Cockpit; hindari mengejar spike awal.';
-      mappingBridgeText = `Jadwal ${mainEvent.title} (${evTimeStr} WITA) sudah lewat. Pantau apakah terjadi sapuan likuiditas dan tunggu MSS M5 sebelum entri.`;
-    }
-  }
-
-  // Faktor Dominan #2 (Geopolitik / Safe Haven) & #3 (Yield)
-  const dom2Title = hasGeopolitics && !isDeescalation
-    ? 'Tensi Geopolitik Aktif (Safe Haven)'
-    : (isDeescalation ? 'Peredaan Tensi Geopolitik' : 'Permintaan Safe Haven & Bank Sentral');
-  const dom2Reason = hasGeopolitics && !isDeescalation
-    ? `Berita geopolitik terbaru (${truncate(geopoliticsItems[0]?.text || '', 72)}) menjaga minat lindung nilai pada Gold.`
-    : (isDeescalation
-      ? 'Sinyal de-eskalasi dan pembicaraan damai mengurangi premi risiko safe haven pada Gold.'
-      : 'Akumulasi cadangan emas bank sentral tetap menjadi fondasi penopang jangka panjang.');
-  const dom3Title = 'Imbal Hasil US Treasury 10-Year';
-  const dom3Reason = 'Korelasi terbalik yield obligasi riil AS tetap menjadi penentu arus modal institusi terhadap emas non-yielding.';
 
   if (statusEl) {
-    if (!hasEvents) {
-      statusEl.textContent = `Pembaruan ${timeStrWita} • Kalender offline • Mode teknikal`;
-    } else if (isCalendarLive) {
-      statusEl.textContent = `Pembaruan ${timeStrWita} • ${usdEvents.length} agenda USD tersinkron (Live)`;
-    } else if (isStaleCache) {
-      statusEl.textContent = `Pembaruan ${timeStrWita} • ${usdEvents.length} agenda USD (Cache usang >24j)`;
-    } else {
-      statusEl.textContent = `Pembaruan ${timeStrWita} • ${usdEvents.length} agenda USD (Cache lokal)`;
-    }
+    const calSummary = usdEvents.length > 0
+      ? `${todayUsd.length} agenda USD hari ini`
+      : 'Kalender offline';
+    statusEl.textContent = `${timeStrWita} · ${syncText} · ${calSummary}`;
   }
 
-  // Bukti Pendukung vs Risiko Pembatal (Dinamis & Dapat Diklik)
-  const supportItems = [];
-  const opposeItems = [];
-  if (!hasEvents) {
-    supportItems.push('Tidak ada rilis ekonomi AS terjadwal; keputusan fokus pada struktur Mapping.');
-    opposeItems.push('Waspadai berita mendadak (geopolitik / pidato The Fed) di luar kalender.');
-  } else if (goldBiasClass === 'bullish') {
-    supportItems.push(`${escapeHtml(mainEvent?.title || 'Data AS')}: melemahkan USD & memberi ruang pantulan Gold.`);
-    if (mainEvent) {
-      supportItems.push(`<button type="button" class="intel-evidence-link" onclick="openEvidenceCalendar()">Lihat Kalender: ${escapeHtml(mainEvent.title)} (${escapeHtml(mainEvent.actual ? `Act ${mainEvent.actual}` : `F ${mainEvent.forecast || '—'}`)})</button>`);
-    }
-    if (hasGeopolitics && !isDeescalation && geopoliticsItems[0]) {
-      supportItems.push(`<button type="button" class="intel-evidence-link" onclick="openEvidenceNews('${escapeHtml(newsId(geopoliticsItems[0]))}')">Berita Geopolitik: ${escapeHtml(truncate(geopoliticsItems[0].text, 48))}</button>`);
-    }
-    if (bridge.isBearBreakdown) {
-      opposeItems.push(`Struktur teknikal M15 masih ${escapeHtml(bridge.zoneText)} — hindari Buy sebelum ada MSS Bullish M5.`);
-    }
-    opposeItems.push('Suku bunga The Fed masih di level restriktif jika data AS berikutnya kembali kuat.');
-  } else if (goldBiasClass === 'bearish') {
-    supportItems.push(`${escapeHtml(mainEvent?.title || 'Data AS')}: menopang DXY & menekan Gold.`);
-    if (mainEvent) {
-      supportItems.push(`<button type="button" class="intel-evidence-link" onclick="openEvidenceCalendar()">Lihat Kalender: ${escapeHtml(mainEvent.title)} (${escapeHtml(mainEvent.actual ? `Act ${mainEvent.actual}` : `F ${mainEvent.forecast || '—'}`)})</button>`);
-    }
-    if (hasGeopolitics && !isDeescalation && geopoliticsItems[0]) {
-      opposeItems.push('Tensi geopolitik aktif bertindak sebagai bantalan safe haven penahan penurunan.');
-      opposeItems.push(`<button type="button" class="intel-evidence-link" onclick="openEvidenceNews('${escapeHtml(newsId(geopoliticsItems[0]))}')">Berita Geopolitik: ${escapeHtml(truncate(geopoliticsItems[0].text, 48))}</button>`);
-    } else {
-      opposeItems.push('Permintaan fisik bank sentral menjaga level support struktural jangka panjang.');
-    }
-  } else {
-    supportItems.push('Struktur likuiditas Mapping & dinamika safe haven menjadi panduan utama.');
-    if (mainEvent) {
-      supportItems.push(`<button type="button" class="intel-evidence-link" onclick="openEvidenceCalendar()">Agenda Utama: ${escapeHtml(mainEvent.title)}</button>`);
-    }
-    opposeItems.push('Potensi whipsaw dua arah sebelum arah data/struktur benar-benar terkonfirmasi.');
-  }
+  // Build 4-column Live Telemetry Strip
+  const telemetryHtml = k.factors.map(f => {
+    const toneCls = f.available ? `tone-${f.tone}` : 'tone-offline';
+    return `
+      <div class="km-metric ${toneCls}">
+        <div class="km-metric__top">
+          <span class="km-metric__label">${escapeHtml(f.label)}</span>
+          ${renderSparklineSvg(f.sparkline, f.tone)}
+        </div>
+        <div class="km-metric__val">${escapeHtml(f.priceText)}</div>
+        <div class="km-metric__foot">
+          <span class="km-metric__delta">${escapeHtml(f.deltaText)}</span>
+          <span class="km-metric__impact">
+            <span class="km-dot ${toneCls}" aria-hidden="true"></span>
+            ${escapeHtml(f.goldImpact)}
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
 
-  // Event list sesi ini
-  let eventListHtml = '';
-  if (importantToday.length > 0) {
-    eventListHtml = importantToday.map(ev => {
+  // Build Agenda USD rows (up to 4 compact rows)
+  let agendaRowsHtml = '';
+  if (k.displayEvents.length > 0) {
+    agendaRowsHtml = k.displayEvents.map(ev => {
       const evDate = new Date(ev.date);
-      const timeStr = Number.isFinite(evDate.getTime())
-        ? evDate.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }) + ' WITA'
-        : 'Sesi NY';
+      const timeLabel = Number.isFinite(evDate.getTime())
+        ? evDate.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' })
+        : 'NY';
       const imp = String(ev.impact || '').toLowerCase();
-      const impLabel = imp === 'high' ? 'High Impact' : 'Medium';
-      const impClass = imp === 'high' ? 'tag-high' : 'tag-med';
-      const hasActual = Boolean(ev.actual && ev.actual !== '--' && ev.actual !== '—');
-      const isMain = mainEvent && ev.title === mainEvent.title && ev.date === mainEvent.date;
+      const impText = imp === 'high' ? 'HIGH' : 'MED';
+      const impCls = imp === 'high' ? 'is-high' : 'is-med';
+      const hasAct = Boolean(ev.actual && ev.actual !== '—' && ev.actual !== '--') && !(Number.isFinite(evDate.getTime()) && evDate.getTime() > nowMs + 60 * 1000);
+      const releasedEval = hasAct ? engine.evaluateReleasedEvent(ev, nowMs) : null;
+      const actTone = releasedEval
+        ? (releasedEval.direction === 1 ? 'tone-bull' : (releasedEval.direction === -1 ? 'tone-bear' : ''))
+        : '';
+      const cd = formatAgendaCountdown(ev.date, nowMs, hasAct);
 
       return `
-        <div class="briefing-event-item ${isMain ? 'is-primary-event' : ''}">
-          <div class="event-item-top">
-            <span class="event-item-time">🇺🇸 ${escapeHtml(timeStr)}${isMain ? ' · Fokus Utama' : ''}</span>
-            <span class="event-item-tag ${impClass}">${impLabel}</span>
+        <div class="km-event-row ${cd.cls === 'is-lock' ? 'is-lock-row' : ''}">
+          <div class="km-event-row__main">
+            <span class="km-event-time">${escapeHtml(timeLabel)}</span>
+            <span class="km-event-imp ${impCls}">${impText}</span>
+            <span class="km-event-title">${escapeHtml(ev.title)}</span>
           </div>
-          <div class="event-item-title">${escapeHtml(ev.title)}</div>
-          <div class="event-item-numbers">
-            <span>Forecast: <strong>${escapeHtml(ev.forecast || '—')}</strong></span>
-            <span>Previous: <strong>${escapeHtml(ev.previous || '—')}</strong></span>
-            <span>Actual: <strong class="${hasActual ? 'act-live' : ''}">${escapeHtml(ev.actual || '—')}</strong></span>
+          <div class="km-event-row__meta">
+            <span class="km-event-nums">
+              <span>F <b>${escapeHtml(ev.forecast || '—')}</b></span>
+              <span>P <b>${escapeHtml(ev.previous || '—')}</b></span>
+              <span>Act <b class="${actTone}">${escapeHtml(hasAct ? ev.actual : '—')}</b></span>
+            </span>
+            <span class="km-event-cd ${cd.cls}">${escapeHtml(cd.text)}</span>
           </div>
         </div>
       `;
     }).join('');
-  } else if (mainEvent) {
-    const evDate = new Date(mainEvent.date);
-    const timeStr = Number.isFinite(evDate.getTime())
-      ? evDate.toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }) + ' WITA'
-      : 'Mendatang';
-    const hasActual = Boolean(mainEvent.actual && mainEvent.actual !== '—' && mainEvent.actual !== '--');
-    eventListHtml = `
-      <div class="briefing-event-item is-primary-event">
-        <div class="event-item-top">
-          <span class="event-item-time">🇺🇸 ${escapeHtml(timeStr)}</span>
-          <span class="event-item-tag tag-med">Agenda Terdekat</span>
-        </div>
-        <div class="event-item-title">${escapeHtml(mainEvent.title)}</div>
-        <div class="event-item-numbers">
-          <span>Forecast: <strong>${escapeHtml(mainEvent.forecast || '—')}</strong></span>
-          <span>Previous: <strong>${escapeHtml(mainEvent.previous || '—')}</strong></span>
-          <span>Actual: <strong class="${hasActual ? 'act-live' : ''}">${escapeHtml(mainEvent.actual || '—')}</strong></span>
-        </div>
-      </div>
-    `;
   } else {
-    eventListHtml = '<div class="briefing-empty-events">Tidak ada rilis USD berdampak tinggi hari ini <button type="button" class="amy-info-btn" data-info-tip="Tidak ada rilis data USD berdampak tinggi/menengah hari ini. Pergerakan XAU/USD dipandu struktur teknikal Mapping." aria-label="Info rilis USD" aria-expanded="false">i</button></div>';
-  }
-
-  // Playbook reaksi dinamis (ZERO harga hardcoded, ZERO raw markdown *...*)
-  let scenarioReactionHtml = '';
-  const eventReleaseTimeWita = (mainEvent?.date && Number.isFinite(new Date(mainEvent.date).getTime()))
-    ? new Date(mainEvent.date).toLocaleTimeString('en-GB', { timeZone, hour: '2-digit', minute: '2-digit' }) + ' WITA'
-    : 'Sesi NY';
-
-  if (isLaborPackage) {
-    const fNfp = escapeHtml(nfpEvent?.forecast || 'konsensus');
-    const verdictHtml = isReleased
-      ? `<div class="verdict-banner-box ${goldBiasClass === 'bearish' ? 'verdict-bear' : (goldBiasClass === 'bullish' ? 'verdict-bull' : 'verdict-neutral')}">
-           <div class="verdict-banner-head">Hasil Resmi Rilis NFP (${escapeHtml(mainEvent.actual)})</div>
-           <p class="verdict-banner-body">${escapeHtml(eventAnalysis.scenarioDesc)} Fokus validasi zona PD Array di Mapping Cockpit.</p>
-         </div>`
-      : '';
-    scenarioReactionHtml = `
-      <div class="reaction-guide-box">
-        ${verdictHtml}
-        <div class="reaction-title">${isReleased ? 'Evaluasi Skenario Pasca-Rilis NFP' : 'Playbook Reaksi Gold Terhadap NFP'}</div>
-        <ul class="briefing-list">
-          <li><strong>Data Lebih Kuat dari ${fNfp} (Strong USD):</strong> Tekanan jual <em>bearish</em> ke Gold — pantau <em>Sell on Rally</em> di zona Supply menuju EQ (${escapeHtml(bridge.rangeEqStr)}) hingga Range Low (${escapeHtml(bridge.rangeLowStr)}).</li>
-          <li><strong>Data Lebih Lemah dari ${fNfp} (Weak USD):</strong> Katalis reli <em>bullish</em> Gold — tunggu retest Demand setelah <em>sweep</em> menuju likuiditas atas (${escapeHtml(bridge.bslStr)}).</li>
-          <li><strong>Sesuai Konsensus (Mixed):</strong> Risiko <em>whipsaw</em> dua arah; hindari entri di tengah EQ (${escapeHtml(bridge.rangeEqStr)}).</li>
-        </ul>
-      </div>
-    `;
-  } else if (mainEvent && (mainEvent.forecast || mainEvent.previous)) {
-    const fStr = escapeHtml(mainEvent.forecast || mainEvent.previous || 'Konsensus');
-    const aStr = escapeHtml(mainEvent.actual || '—');
-    const isInverse = Boolean(eventAnalysis?.inverseUsd);
-
-    const verdictHtml = isReleased
-      ? `<div class="verdict-banner-box ${goldBiasClass === 'bearish' ? 'verdict-bear' : (goldBiasClass === 'bullish' ? 'verdict-bull' : 'verdict-neutral')}">
-           <div class="verdict-banner-head">${goldBiasClass === 'bullish' ? 'Hasil Resmi: Dukungan Bullish Gold (USD Melemah)' : (goldBiasClass === 'bearish' ? 'Hasil Resmi: Tekanan Bearish Gold (USD Menguat)' : 'Hasil Resmi: Sesuai Konsensus / Netral')}</div>
-           <p class="verdict-banner-body">Data aktual <strong>${escapeHtml(mainEvent.title)}</strong> rilis <strong class="act-live">${aStr}</strong> (vs perkiraan ${fStr}). ${escapeHtml(eventAnalysis.scenarioDesc)}</p>
-         </div>`
-      : '';
-
-    scenarioReactionHtml = `
-      <div class="reaction-guide-box">
-        ${verdictHtml}
-        <div class="reaction-title">${isReleased ? 'Evaluasi Skenario Pasca-Rilis' : 'Playbook Reaksi Gold'}: ${escapeHtml(mainEvent.title)}</div>
-        <ul class="briefing-list">
-          ${isInverse ? `
-            <li class="${isReleased && goldBiasClass === 'bullish' ? 'playbook-hit-bull' : ''}"><strong>Actual &gt; ${fStr} (Klaim Naik):</strong> USD melemah ➔ peluang pantulan <em>bullish</em> untuk Gold.${isReleased && goldBiasClass === 'bullish' ? ' <strong>[Terkonfirmasi]</strong>' : ''}</li>
-            <li class="${isReleased && goldBiasClass === 'bearish' ? 'playbook-hit-bear' : ''}"><strong>Actual &lt; ${fStr} (Klaim Turun):</strong> USD menguat ➔ tekanan <em>bearish</em> ke Gold.${isReleased && goldBiasClass === 'bearish' ? ' <strong>[Terkonfirmasi]</strong>' : ''}</li>
-          ` : `
-            <li class="${isReleased && goldBiasClass === 'bearish' ? 'playbook-hit-bear' : ''}"><strong>Actual &gt; ${fStr} (Data AS Kuat):</strong> DXY &amp; Yield menguat ➔ tekanan <em>bearish</em> untuk Gold.${isReleased && goldBiasClass === 'bearish' ? ' <strong>[Terkonfirmasi]</strong>' : ''}</li>
-            <li class="${isReleased && goldBiasClass === 'bullish' ? 'playbook-hit-bull' : ''}"><strong>Actual &lt; ${fStr} (Data AS Lemah):</strong> DXY melemah ➔ dorongan <em>bullish</em> untuk Gold.${isReleased && goldBiasClass === 'bullish' ? ' <strong>[Terkonfirmasi]</strong>' : ''}</li>
-          `}
-        </ul>
+    agendaRowsHtml = `
+      <div class="km-empty-inline">
+        Tidak ada jadwal USD berdampak High/Medium tersisa hari ini — fokus penuh pada struktur Mapping.
       </div>
     `;
   }
 
-  const narrativeSummary = hasEvents
-    ? (isReleased
-        ? `Pasca rilis <strong>${escapeHtml(mainEvent.title)}</strong> (Aktual <strong class="act-live">${escapeHtml(mainEvent.actual)}</strong> vs perkiraan ${escapeHtml(mainEvent.forecast || mainEvent.previous || '—')}), bias fundamental XAU/USD berada pada kondisi <strong>${escapeHtml(goldBias)}</strong>. ${escapeHtml(eventAnalysis.scenarioDesc)}`
-        : (!isReleased && isTimePassed && minutesSinceScheduled >= 5
-            ? `Jadwal rilis <strong>${escapeHtml(mainEvent.title)}</strong> telah lewat (${escapeHtml(eventReleaseTimeWita)}). Angka resmi belum terpublikasi di feed — hindari mengejar <em>spike</em> awal dan pantau struktur Dealing Range di Mapping Cockpit.`
-            : `Fokus sesi ini tertuju pada <strong>${escapeHtml(mainEvent?.title || 'agenda ekonomi AS')}</strong> (Forecast ${escapeHtml(mainEvent?.forecast || '—')} vs Previous ${escapeHtml(mainEvent?.previous || '—')}). ${escapeHtml(eventAnalysis?.scenarioDesc || '')}`))
-    : 'Belum ada rilis data ekonomi AS terjadwal. Pergerakan XAU/USD dipandu oleh struktur teknikal dan likuiditas di Mapping Cockpit.';
+  // Build compact 2-line Trigger Playbook (only when forecast/previous exists)
+  let playbookHtml = '';
+  if (k.triggerPlaybook) {
+    const tp = k.triggerPlaybook;
+    const bullHit = tp.isReleased && tp.releasedDirection === 1;
+    const bearHit = tp.isReleased && tp.releasedDirection === -1;
+    playbookHtml = `
+      <div class="km-playbook">
+        <div class="km-playbook__head">
+          <span>Pemicu Reaksi · ${escapeHtml(tp.title)}</span>
+          ${tp.isReleased ? `<span class="km-playbook__act">Aktual ${escapeHtml(tp.actual)}</span>` : ''}
+        </div>
+        <div class="km-playbook__row ${bullHit ? 'is-hit-bull' : ''}">
+          <span class="km-playbook__cond tone-bull">${escapeHtml(tp.bullCondition)}</span>
+          <span class="km-playbook__eff">${escapeHtml(tp.bullEffect)}${bullHit ? ' · Terkonfirmasi' : ''}</span>
+        </div>
+        <div class="km-playbook__row ${bearHit ? 'is-hit-bear' : ''}">
+          <span class="km-playbook__cond tone-bear">${escapeHtml(tp.bearCondition)}</span>
+          <span class="km-playbook__eff">${escapeHtml(tp.bearEffect)}${bearHit ? ' · Terkonfirmasi' : ''}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Build Dealing Range Position Gauge
+  const markerPct = Math.max(2, Math.min(98, Number.isFinite(bridge.pct) ? bridge.pct : 50));
+  const h1Cls = k.tech.h1Dir === 1 ? 'tone-bull' : (k.tech.h1Dir === -1 ? 'tone-bear' : '');
+  const m15Cls = k.tech.m15Dir === 1 ? 'tone-bull' : (k.tech.m15Dir === -1 ? 'tone-bear' : '');
+  const zoneCls = bridge.zoneTone === 'discount' || bridge.zoneTone === 'breakout'
+    ? 'tone-bull'
+    : (bridge.zoneTone === 'premium' || bridge.zoneTone === 'breakdown' ? 'tone-bear' : '');
+
+  // Build compact 2-item Berita Penggerak Utama strip
+  const topNewsHtml = k.topNews.length > 0
+    ? k.topNews.map(item => {
+        const id = newsId(item);
+        const cat = classifyNewsCategory(item);
+        const relTime = formatTime(item.time) || 'Terkini';
+        const isHigh = getNewsImpactLevel(item) === 'high';
+        return `
+          <button type="button" class="km-news-row" onclick="openEvidenceNews('${escapeHtml(id)}')">
+            <div class="km-news-row__body">
+              <div class="km-news-row__meta">
+                <span class="km-news-cat">${escapeHtml(cat.label)}</span>
+                <span class="km-sep" aria-hidden="true">·</span>
+                <span class="km-news-time">${escapeHtml(relTime)}</span>
+                ${isHigh ? '<span class="km-sep" aria-hidden="true">·</span><span class="km-news-high">High Impact</span>' : ''}
+              </div>
+              <p class="km-news-text">${escapeHtml(truncate(item.text, 148))}</p>
+            </div>
+            <span class="km-news-arrow" aria-hidden="true">→</span>
+          </button>
+        `;
+      }).join('')
+    : `<div class="km-empty-inline">Belum ada headline penggerak Gold terbaru pada sesi ini.</div>`;
 
   container.innerHTML = `
-    <div class="fundamental-briefing-wrap">
-      <!-- 1. Kompas Utama & Scorecard -->
-      <article class="briefing-card card-primary card-conclusion tone-${goldBiasClass}">
-        <div class="card-head card-head-tight">
-          <div class="card-title-wrap">
-            <h2 class="card-title">Kompas Fundamental XAU/USD</h2>
+    <div class="km-shell" data-km-tone="${escapeHtml(k.tone)}">
+      <!-- 1. Institutional Hero Verdict & SVG Macro Compass Gauge -->
+      <section class="km-hero">
+        <div class="km-hero__copy">
+          <div class="km-kicker">
+            <span class="km-kicker__title">KOMPAS MAKRO XAU/USD</span>
+            <span class="km-sep" aria-hidden="true">·</span>
+            <span>${escapeHtml(dateStrWita)}</span>
+            <span class="km-sep" aria-hidden="true">·</span>
+            <span class="km-sync tone-${escapeHtml(syncTone)}">
+              <span class="km-dot tone-${escapeHtml(syncTone)}" aria-hidden="true"></span>
+              ${escapeHtml(syncText)}
+            </span>
           </div>
-          ${syncBadgeHtml}
-        </div>
-
-        <div class="kompas-subrow">
-          <span class="kompas-date-label">${escapeHtml(dateStrWita)}</span>
-          <span class="kompas-horizon-pill">Horizon: <strong>${escapeHtml(horizonStr)}</strong></span>
-        </div>
-
-        <div class="conclusion-badge tone-${goldBiasClass}">${escapeHtml(conclusionBias)}</div>
-
-        <div class="editorial-narrative-box">
-          <p class="conclusion-guide">${narrativeSummary}</p>
-        </div>
-
-        <div class="scorecard-grid">
-          <div class="scorecard-item">
-            <span class="score-label">USD / DXY</span>
-            <span class="score-value">${escapeHtml(usdScore)}</span>
-          </div>
-          <div class="scorecard-item">
-            <span class="score-label">Yield US Treasury</span>
-            <span class="score-value">${escapeHtml(yieldScore)}</span>
-          </div>
-          <div class="scorecard-item">
-            <span class="score-label">Risk Sentiment</span>
-            <span class="score-value">${escapeHtml(riskScore)}</span>
-          </div>
-          <div class="scorecard-item">
-            <span class="score-label">Bias Fundamental Gold</span>
-            <span class="score-value">${escapeHtml(goldBias)}</span>
-          </div>
-        </div>
-      </article>
-
-      <!-- 2. Katalis & Playbook Sesi Ini -->
-      <article class="briefing-card">
-        <div class="card-head">
-          <div class="card-title-wrap">
-            <h3 class="card-title">Katalis Sesi Ini &amp; Playbook <button type="button" class="amy-info-btn" data-info-tip="Pantau khusus pernyataan pejabat The Fed, arah indeks DXY, dan imbal hasil US 10-Year." aria-label="Info katalis" aria-expanded="false">i</button></h3>
-          </div>
-          <span class="bias-pill highlight">Kalender USD</span>
-        </div>
-        <div class="briefing-events-container">${eventListHtml}</div>
-        ${scenarioReactionHtml}
-      </article>
-
-      <!-- 3. Komparasi Aset & Jembatan Eksekusi Mapping -->
-      <article class="briefing-card card-execution">
-        <div class="card-head">
-          <div class="card-title-wrap">
-            <h3 class="card-title">Sinkronisasi Aset &amp; Jembatan Mapping</h3>
-          </div>
-          <span class="bias-pill ${goldBiasClass}">${escapeHtml(goldBias)}</span>
-        </div>
-
-        <div class="intel-dual-grid">
-          <div class="intel-dual-card card-usd">
-            <div class="intel-dual-head">
-              <span class="intel-dual-title">Dolar AS (USD / DXY)</span>
-              <span class="intel-dual-status ${usdDualTone}">${escapeHtml(usdDualStatus)}</span>
+          <h2 class="km-verdict tone-${escapeHtml(k.tone)}">${escapeHtml(k.verdictTitle)}</h2>
+          <p class="km-summary">${escapeHtml(k.summary)}</p>
+          <div class="km-meta-strip">
+            <div class="km-meta-item">
+              <span class="km-meta-label">Kesesuaian</span>
+              <strong class="km-meta-val tone-${escapeHtml(k.alignment.tone)}">${escapeHtml(k.alignment.label)}</strong>
             </div>
-            <p class="intel-dual-text">${escapeHtml(usdDualText)}</p>
-          </div>
-          <div class="intel-dual-card card-gold">
-            <div class="intel-dual-head">
-              <span class="intel-dual-title">Gold (XAU/USD)</span>
-              <span class="intel-dual-status ${goldDualTone}">${escapeHtml(goldDualStatus)}</span>
+            <div class="km-meta-item">
+              <span class="km-meta-label">H1 / M15</span>
+              <strong class="km-meta-val"><span class="${h1Cls}">${escapeHtml(k.tech.h1Label)}</span> / <span class="${m15Cls}">${escapeHtml(k.tech.m15Label)}</span></strong>
             </div>
-            <p class="intel-dual-text">${escapeHtml(goldDualText)}</p>
+            <div class="km-meta-item">
+              <span class="km-meta-label">Sesi Aktif</span>
+              <strong class="km-meta-val">${escapeHtml(k.tech.sessionLabel)}</strong>
+            </div>
           </div>
         </div>
-
-        <div class="scenario-box bridge-box">
-          <div class="bridge-box-head">
-            <span class="scenario-box-title">Jembatan Eksekusi ke Mapping Cockpit</span>
-            <a class="intel-bridge-cta" href="../mapping/index.html">Buka Mapping →</a>
-          </div>
-          <div class="intel-ict-strip">
-            <div class="intel-ict-pill">Harga: <strong>${escapeHtml(bridge.priceStr)}</strong></div>
-            <div class="intel-ict-pill zone-pill-${bridge.zoneTone}">Zona: <strong>${escapeHtml(bridge.zoneText)}</strong></div>
-            <div class="intel-ict-pill">Range High: <strong>${escapeHtml(bridge.rangeHighStr)}</strong></div>
-            <div class="intel-ict-pill">Range Low: <strong>${escapeHtml(bridge.rangeLowStr)}</strong></div>
-            <div class="intel-ict-pill">EQ 50%: <strong>${escapeHtml(bridge.rangeEqStr)}</strong></div>
-            <div class="intel-ict-pill">BSL Atas: <strong>${escapeHtml(bridge.bslStr)}</strong></div>
-            <div class="intel-ict-pill">SSL Bawah: <strong>${escapeHtml(bridge.sslStr)}</strong></div>
-          </div>
-          <p class="bridge-guide-text">${escapeHtml(mappingBridgeText)}</p>
+        <div class="km-hero__dial">
+          ${renderCompassGaugeSvg(k.score, k.tone, k.counts, k.activeFactorCount)}
         </div>
+      </section>
 
-        <div class="judas-swing-warning-box ${isReleased ? 'is-post-release' : ''}">
-          <div class="judas-swing-head">
-            <span>${isReleased ? 'Fase Pasca-Rilis · Konfirmasi M5/M15' : `News Lock ±15m · Waspada Judas Swing (${escapeHtml(eventReleaseTimeWita)})`} <button type="button" class="amy-info-btn" data-info-tip="${escapeHtml(isReleased
-              ? 'Data aktual telah rilis. Fase News Lock berakhir — validasi pembentukan Market Structure Shift (MSS) dan Displacement di M5/M15 pada Mapping Cockpit sebelum eksekusi.'
-              : `Disiplin tahan posisi (News Lock) 15 menit sebelum hingga 15 menit sesudah rilis untuk menghindari sapuan likuiditas palsu (Judas Swing) pada BSL (${bridge.bslStr}) maupun SSL (${bridge.sslStr}).`)}" aria-label="Info protokol risiko" aria-expanded="false">i</button></span>
+      <!-- 2. 4-Column Live Macro Telemetry Strip -->
+      <section class="km-telemetry" aria-label="Telemetri Makro Real-Time">
+        ${telemetryHtml}
+      </section>
+
+      <!-- 3. Split Action Desk: Agenda USD + Jembatan Mapping -->
+      <section class="km-split">
+        <article class="km-panel">
+          <div class="km-panel__head">
+            <h3 class="km-panel__title">${k.isTodayAgenda ? 'Agenda USD Hari Ini' : 'Agenda USD Terdekat'}</h3>
+            <button type="button" class="km-link-btn" onclick="openEvidenceCalendar()">Kalender Lengkap →</button>
           </div>
-        </div>
-      </article>
+          <div class="km-event-list">
+            ${agendaRowsHtml}
+          </div>
+          ${playbookHtml}
+        </article>
 
-      <!-- 4. Rincian Faktor & Bukti Makro (Collapsible) -->
-      <details class="briefing-card briefing-accordion">
-        <summary class="briefing-accordion-summary">
-          <span>Rincian 3 Faktor Dominan, Skenario &amp; Bukti Makro</span>
-          <span class="accordion-arrow">▾</span>
-        </summary>
-        <div class="briefing-accordion-body">
-          <div class="scenario-box">
-            <div class="scenario-box-title">Skenario Fundamental Terstruktur</div>
-            <ul class="briefing-list">
-              <li><strong>Skenario Utama:</strong> ${escapeHtml(mainScenario)}</li>
-              <li><strong>Kondisi Penguat:</strong> ${escapeHtml(confirmCondition)}</li>
-              <li><strong>Batas Pembatalan (Invalidasi):</strong> ${escapeHtml(invalidationCondition)}</li>
-            </ul>
+        <article class="km-panel">
+          <div class="km-panel__head">
+            <div class="km-panel__title-group">
+              <h3 class="km-panel__title">Mapping XAU/USD</h3>
+              <span class="km-spot-price">${escapeHtml(bridge.priceStr)}</span>
+            </div>
+            <a class="km-link-btn" href="../mapping/index.html">Buka Mapping →</a>
           </div>
 
-          <div class="dominant-factors-box">
-            <div class="dominant-factors-title">3 Faktor Penggerak Utama</div>
-            <div class="dominant-factor-item">
-              <span class="dominant-factor-rank">#1</span>
-              <div class="dominant-factor-text"><strong>${escapeHtml(dom1Title)}:</strong> ${escapeHtml(dom1Reason)}</div>
+          <div class="km-bridge-stats">
+            <div class="km-bridge-stat">
+              <span class="km-stat-k">H1 Bias</span>
+              <strong class="km-stat-v ${h1Cls}">${escapeHtml(k.tech.h1Label)}</strong>
             </div>
-            <div class="dominant-factor-item">
-              <span class="dominant-factor-rank">#2</span>
-              <div class="dominant-factor-text"><strong>${escapeHtml(dom2Title)}:</strong> ${escapeHtml(dom2Reason)}</div>
+            <div class="km-bridge-stat">
+              <span class="km-stat-k">M15 Struktur</span>
+              <strong class="km-stat-v ${m15Cls}">${escapeHtml(k.tech.m15Label)}</strong>
             </div>
-            <div class="dominant-factor-item">
-              <span class="dominant-factor-rank">#3</span>
-              <div class="dominant-factor-text"><strong>${escapeHtml(dom3Title)}:</strong> ${escapeHtml(dom3Reason)}</div>
+            <div class="km-bridge-stat">
+              <span class="km-stat-k">Posisi Range</span>
+              <strong class="km-stat-v ${zoneCls}">${escapeHtml(bridge.zoneText)}</strong>
             </div>
           </div>
 
-          <div class="kompas-evidence-cols">
-            <div class="kompas-evidence-col col-support">
-              <div class="evidence-col-title">Bukti Pendukung Bias</div>
-              <ul class="evidence-list">${supportItems.map(i => `<li>${i}</li>`).join('')}</ul>
+          <div class="km-range" aria-label="Posisi harga pada Dealing Range">
+            <div class="km-range__labels-top">
+              <span>DISKON</span>
+              <span>EQ 50%</span>
+              <span>PREMIUM</span>
             </div>
-            <div class="kompas-evidence-col col-oppose">
-              <div class="evidence-col-title">Risiko &amp; Faktor Pembatal</div>
-              <ul class="evidence-list">${opposeItems.map(i => `<li>${i}</li>`).join('')}</ul>
+            <div class="km-range__track">
+              <div class="km-range__eq-tick" aria-hidden="true"></div>
+              <div class="km-range__marker" style="left: ${markerPct}%;" title="Harga Live ${escapeHtml(bridge.priceStr)}"></div>
+            </div>
+            <div class="km-range__levels">
+              <span>${escapeHtml(bridge.rangeLowStr)}</span>
+              <span>${escapeHtml(bridge.rangeEqStr)}</span>
+              <span>${escapeHtml(bridge.rangeHighStr)}</span>
             </div>
           </div>
-          ${hasEnergyRisk ? '<p class="energy-risk-note">Risiko Energi Aktif <button type="button" class="amy-info-btn" data-info-tip="Berita minyak/energi terdeteksi aktif — waspadai efek rambatan ke ekspektasi inflasi." aria-label="Info risiko energi" aria-expanded="false">i</button></p>' : ''}
+
+          <div class="km-liq-row">
+            <div class="km-liq-cell">
+              <span class="km-stat-k">BSL Atas (Target Buy)</span>
+              <strong class="km-stat-v tone-bear">${escapeHtml(bridge.bslStr)}</strong>
+            </div>
+            <div class="km-liq-cell">
+              <span class="km-stat-k">SSL Bawah (Target Sell)</span>
+              <strong class="km-stat-v tone-bull">${escapeHtml(bridge.sslStr)}</strong>
+            </div>
+          </div>
+
+          <p class="km-bridge-note">${escapeHtml(k.bridgeNote)}</p>
+        </article>
+      </section>
+
+      <!-- 4. Berita Penggerak Utama (Compact 2-Row Clickable Strip) -->
+      <section class="km-panel km-news">
+        <div class="km-panel__head">
+          <h3 class="km-panel__title">Berita Penggerak Utama</h3>
+          <button type="button" class="km-link-btn" onclick="activateTab('news')">Semua Berita →</button>
         </div>
-      </details>
+        <div class="km-news-list">
+          ${topNewsHtml}
+        </div>
+      </section>
     </div>
   `;
 }
