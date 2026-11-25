@@ -1,25 +1,27 @@
 {
-  "apk_url": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.472/AmyFX-Pro-latest.apk",
+  "apk_url": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.477/AmyFX-Pro-latest.apk",
   "changelog": [
-    "✦ Notifikasi POI Mapping Cockpit (M5 & M15): Ganti seluruh notifikasi sinyal engine lama dengan event POI FVG & OB (M5 + M15) murni.",
-    "✦ Format Presisi: Menampilkan arah (BUY/SELL), kind (FVG/OB), timeframe (M5/M15), rentang harga zona, CE 50%, SL, TP1, dan TP2.",
-    "✦ Pengawalan Siklus Hasil Penuh: Update otomatis untuk 🎯 TP1 BEP ✓, 👑 TP2 DOL ★ (+100 Pips), dan 🛡️ Jebol SL ✕.",
-    "✦ Deduplikasi Ketat & Anti-Spam: 1 zona POI hanya mengirim 1x saat disentuh/sentuh CE dan 1x saat hasil akhir."
+    "✦ Audit Total Mapping Cockpit & Riwayat POI: Perbaikan penyelarasan index candle openTime, deduplikasi cross-TF M15/M5, SL/TP zona cadangan independen, persistence reset floor, dan proteksi konteks/tick akhir pekan.",
+    "✦ Kalkulator Lot & Sync Profil Aman: Guard anti-duplikasi listener O(2^N), dukung cashflow negatif, sinkronisasi GitHub Cloud Sync untuk Custom Price Alerts, Mastery Academy, & Riwayat Baca.",
+    "✦ Jurnal, Market Intel & Academy: Perbaikan tombol mode asisten & ekspor PDF/Markdown Jurnal, pembersihan sisa endpoint Supabase di Market Intel, filter candle sintetis heatmap, serta fallback endpoint APK.",
+    "✦ AMY Assistant, Tema & Navigasi Global: Pemulihan skor Daily Loss Guard & ringkasan POI Trading, deteksi tema sistem OS otomatis, serta tombol kembali 1-langkah untuk layar penuh & modal.",
+    "✦ Server Lokal, API & Android Native: Validasi allowlist interval heatmap/liquidity & SQLite lokal, limit POST body 2MB, rule ProGuard AmyFxAiBridge, dan alias bridge MainActivity."
   ],
-  "downloadUrl": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.472/AmyFX-Pro-latest.apk",
+  "downloadUrl": "https://github.com/suhaimitoamy/Amy-fx-pro/releases/download/amyfx-pro-2.0.0-pro.477/AmyFX-Pro-latest.apk",
   "enabled": true,
   "force_update": false,
-  "latest_version_code": 950472,
-  "latest_version_name": "2.0.0-pro.472",
+  "latest_version_code": 950477,
+  "latest_version_name": "2.0.0-pro.477",
   "mandatory": false,
-  "releaseDate": "2026-11-23",
+  "releaseDate": "2026-11-25",
   "release_notes": [
-    "✦ Notifikasi POI Mapping Cockpit (M5 & M15): Ganti seluruh notifikasi sinyal engine lama dengan event POI FVG & OB (M5 + M15) murni.",
-    "✦ Format Presisi: Menampilkan arah (BUY/SELL), kind (FVG/OB), timeframe (M5/M15), rentang harga zona, CE 50%, SL, TP1, dan TP2.",
-    "✦ Pengawalan Siklus Hasil Penuh: Update otomatis untuk 🎯 TP1 BEP ✓, 👑 TP2 DOL ★ (+100 Pips), dan 🛡️ Jebol SL ✕.",
-    "✦ Deduplikasi Ketat & Anti-Spam: 1 zona POI hanya mengirim 1x saat disentuh/sentuh CE dan 1x saat hasil akhir."
+    "✦ Audit Total Mapping Cockpit & Riwayat POI: Perbaikan penyelarasan index candle openTime, deduplikasi cross-TF M15/M5, SL/TP zona cadangan independen, persistence reset floor, dan proteksi konteks/tick akhir pekan.",
+    "✦ Kalkulator Lot & Sync Profil Aman: Guard anti-duplikasi listener O(2^N), dukung cashflow negatif, sinkronisasi GitHub Cloud Sync untuk Custom Price Alerts, Mastery Academy, & Riwayat Baca.",
+    "✦ Jurnal, Market Intel & Academy: Perbaikan tombol mode asisten & ekspor PDF/Markdown Jurnal, pembersihan sisa endpoint Supabase di Market Intel, filter candle sintetis heatmap, serta fallback endpoint APK.",
+    "✦ AMY Assistant, Tema & Navigasi Global: Pemulihan skor Daily Loss Guard & ringkasan POI Trading, deteksi tema sistem OS otomatis, serta tombol kembali 1-langkah untuk layar penuh & modal.",
+    "✦ Server Lokal, API & Android Native: Validasi allowlist interval heatmap/liquidity & SQLite lokal, limit POST body 2MB, rule ProGuard AmyFxAiBridge, dan alias bridge MainActivity."
   ],
-  "version": "2.0.0-pro.472",
-  "versionCode": 950472,
-  "sha256": "2df79939c3a3f1b0a609fc70222d133d6178816cdb9ad3ac6fd5f237a8e0c496"
+  "version": "2.0.0-pro.477",
+  "versionCode": 950477,
+  "sha256": "95714131b5f1f3880ae62a0d313eb97a21926885a073009beb755a140ec8dbdc"
 }

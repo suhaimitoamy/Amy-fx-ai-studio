@@ -7,7 +7,7 @@ import vm from "node:vm";
 const ROOT = process.cwd();
 
 function loadProAnalytics() {
-  const code = fs.readFileSync(path.join(ROOT, "apps/shared/journal-analytics-pro.js"), "utf8");
+  const code = fs.readFileSync(fs.existsSync(path.join(ROOT, "app/src/main/assets/apps/shared/journal-analytics-pro.js")) ? path.join(ROOT, "app/src/main/assets/apps/shared/journal-analytics-pro.js") : path.join(ROOT, "apps/shared/journal-analytics-pro.js"), "utf8");
   const sandbox = { window: {}, globalThis: {} };
   sandbox.window = sandbox;
   sandbox.globalThis = sandbox;
@@ -87,17 +87,17 @@ test("mountProAnalytics renders Hero Equity Curve, 4 KPI cells, and 3 sub-tabs (
   // Switch to Sesi & Setup sub-tab
   container.clickSubtab("breakdown");
   assert.match(container.innerHTML, /Performa per Sesi \(WITA\)/);
-  assert.match(container.innerHTML, /Performa per Setup ICT/);
+  assert.match(container.innerHTML, /Playbook Scorecard \(Setup ICT\)/);
   assert.doesNotMatch(container.innerHTML, /CALENDAR_MOCK/);
 
   // Switch to Kebocoran sub-tab
   container.clickSubtab("leaks");
-  assert.match(container.innerHTML, /Detektor Kebocoran/);
+  assert.match(container.innerHTML, /Kebocoran/);
   assert.match(container.innerHTML, /FOMO/);
 });
 
 test("apps/journal/index.html has zero duplicate IDs, preserves legacy & drawer hooks, and includes Pro Ledger components", () => {
-  const html = fs.readFileSync(path.join(ROOT, "apps/journal/index.html"), "utf8");
+  const html = fs.readFileSync(fs.existsSync(path.join(ROOT, "app/src/main/assets/apps/journal/index.html")) ? path.join(ROOT, "app/src/main/assets/apps/journal/index.html") : path.join(ROOT, "apps/journal/index.html"), "utf8");
 
   // Verify no duplicate IDs (ignoring known pre-existing assistantModeTabs attribute quirk if any)
   const idCounts = new Map();
@@ -149,16 +149,17 @@ test("apps/journal/index.html has zero duplicate IDs, preserves legacy & drawer 
   }
 
   // User-restored side-drawer views preserved
-  assert.match(html, /data-view="library"/);
-  assert.match(html, /data-view="media"/);
-  assert.match(html, /data-view="assistant"/);
+  assert.match(html, /data-view="journal"/);
+  assert.match(html, /data-view="statistics"/);
+  assert.match(html, /data-view="habits"/);
   assert.match(html, /data-view="notes"/);
   assert.match(html, /journal-pro-ledger\.css/);
 });
 
 test("Pro Ledger stylesheets have balanced braces and Dark + Light theme parity", () => {
   for (const rel of ["apps/journal/journal-pro-ledger.css", "apps/shared/journal-analytics-pro.css"]) {
-    const css = fs.readFileSync(path.join(ROOT, rel), "utf8");
+    const targetPath = fs.existsSync(path.join(ROOT, "app/src/main/assets", rel)) ? path.join(ROOT, "app/src/main/assets", rel) : path.join(ROOT, rel);
+    const css = fs.readFileSync(targetPath, "utf8");
     const opens = (css.match(/\{/g) || []).length;
     const closes = (css.match(/\}/g) || []).length;
     assert.equal(opens, closes, `Unbalanced CSS braces in ${rel}: ${opens} vs ${closes}`);

@@ -1,3 +1,45 @@
+## 2.0.0-pro.477
+
+- fix(mapping-poi): Perbaikan menyeluruh Cockpit Mapping & Riwayat POI (`ict-presentation.js`, `chart-view.js`, `context-panel.js`, `dashboard-v2.js`, `mapping-history-engine.js`, `trade-lifecycle-tracker.js`): penyelarasan index `formedIndex` via `openTime`, deduplikasi cross-TF M15/M5 (window 90 menit), SL/TP zona cadangan independen, persistence `historyResetFloorMs`, proteksi tick & konteks akhir pekan, serta normalisasi timestamp ms/detik.
+- fix(lot-sync): Guard anti-duplikasi listener `O(2^N)` & dukungan cashflow negatif (`lot-calculator.js`), sinkronisasi Cloud Sync GitHub untuk `amyfx_custom_price_alerts`, `amy-guided-v3-mastery`, dan `reading_history_v2` (`github-cloud-sync.js`), serta nonaktifkan prefs Supabase (`method-toggles.js`).
+- fix(journal-intel-academy): Perbaikan tombol dropdown mode asisten & label restore, await `saveJournals()`, serta muat `journal-export.js` (`journal/index.html`, `journal/app.js`); pembersihan endpoint Supabase & guard DOM `ict-intel.js` serta filter candle sintetis (`market-intel/`); perbaikan fallback endpoint APK & path script asisten (`academy/belajar/assets/micro-learning.js`).
+- fix(assistant-nav-theme): Perbaikan selector live price & summary POI/Daily Loss Guard (`amy-local-assistant.js`, `amy-gemini-live-bridge.js`), deteksi tema OS `prefers-color-scheme` (`amyfx-theme-controller.js`), navigasi kembali global untuk modal & chart fullscreen (`amyfx-universal-nav.js`), serta tombol Kompas XAU & pembersihan data lokal lengkap (`app.js`).
+- fix(backend-android): Validasi allowlist interval `api/heatmap.js`, `api/liquidity.js`, & `tools/serve-local.mjs`, gating Supabase news (`api/news.js`), limit POST body 2MB + timezone kalender WITA/WIB (`serve-local.mjs`), rule ProGuard `AmyFxAiBridge` (`proguard-rules.pro`), serta alias bridge & route `News` (`MainActivity.kt`).
+
+## 2.0.0-pro.476
+
+- feat(market-intel): Rombak total Kompas Makro Institusional Real-Time (`api/macro-snapshot.js`, `kompas-engine.js`) berbasis kuotasi live DXY, US10Y, VIX, SMT XAU/XAG, SVG Gauge, dan guard aktual kalender USD.
+- feat(replay): Hadirkan Candle Replay Pro Studio (`replay-indicators.js`, `chart-engine.js`, `practice-ui.js`) dengan Potong Bar, scrubber, 5 tipe chart, indikator zero-future-leak, magnet OHLC, dan 1-klik order.
+- feat(ecosystem): Upgrade 5 Pilar — Command Strip Beranda (`#home-cmd-strip`), Synced Lot Calculator + Breakdown Performa POI, AMY Briefing 30 detik, Jurnal Playbook Scorecard + Leak Detector, serta rotasi multi-key + stale cache backend.
+- fix(mapping-poi): Kalibrasi jarak SL Gold 60–100 pips (`BACKFILL_ENGINE_VERSION = 5`), realisasi PnL bertanda minus/plus jujur, serta sinkronisasi Saldo Aktif Profil.
+
+## 2.0.0-pro.475
+
+- feat(navigation): Navigasi Kembali 1-Langkah Global deterministik di seluruh sub-halaman aplikasi.
+- feat(practice): Wadah terpadu kontrol TradingView Replay dock (`#tvDrawingDock`, `.cr-top-actions`).
+- feat(academy): Buku Interaktif Trading 36 Bab komprehensif dalam 6 Bagian Utama dengan 151 soal Uji Paham.
+- feat(mapping): Deteksi visual institusional Inverse FVG (`+iFVG` / `-iFVG`) dan Breaker Block (`+BB` / `-BB`).
+- fix(mapping-engine): Audit forensik 7 akar penyebab SL, buffer SL wick XAU/USD realistis, evaluasi SL-first, Dealing Range dinamis.
+
+## 2.0.0-pro.474
+
+- feat(academy): Overhaul kurikulum Amy FX Academy ke Jalur Penguasaan 43 Modul (8 Babak Linier):
+  * Kunci Pemahaman Ala Duolingo (`getModuleLockState`, `canOpenLesson`): Menetapkan passing grade >= 80% untuk membuka modul berikutnya secara berurutan.
+  * Placement Exam 100% (`evaluatePlacementAttempt`): Tes penempatan 4 soal (harus benar 4/4) untuk membuka modul inti ICT langsung.
+  * Guided Reader 5-Tab: Tab navigasi terpandu per modul (`Pahami`, `Pohon Keputusan`, `Kasus Gagal`, `Uji Paham`, `Semua`) dengan format teks aman `fmtRich`.
+  * Deep Anti-Confusion Enrichment: Suntikan `extraConceptBlocks`, `mappingSteps`, `decisionTree`, dan `failedCase` pada setiap modul (01-43) via `mastery-deep-enrichment.js` dan `mastery-advanced.js`.
+  * Preservasi Pro & Identitas Gradle: Sinkronisasi identitas versi Gradle 950474 & build workflow CI/CD.
+
+## 2.0.0-pro.473
+
+- feat(ai-studio): Sinkronisasi tuntas seluruh fitur & upgrade dari Google AI Studio:
+  * AMY Live Assistant Bridge (`amy-local-assistant.js`, `amy-gemini-live-bridge.js`, `dashboard-v2.js`): Ekposur kanonis `getLivePrice`, `buildMappingSnapshot`, `readJournals`, `calculateLot`, `isWeekendClosure`, dan snapshot read-only pasif Mapping Cockpit tanpa menyentuh engine.
+  * TwelveData Provider Error Guard (`lib/provider-error-guard.mjs`, `api/twelvedata.js`, `api/heatmap.js`, `api/liquidity.js`): Deteksi otomatis status error & HTTP 429 rate limit dengan fallback payload aman.
+  * Amy FX Academy Level 0 (`level-0.js`, `curriculum.js`, `diagram-engine.js`): 6 Bab Fondasi Pemula Nol (Bab 0.1-0.6) dengan 6 diagram SVG interaktif multi-tahap, pemilih jalur (Level 0 vs Level 1 ICT), dan jembatan praktik langsung (mematuhi GEMINI.md Bagian 9).
+  * UI Modern Paritas Peta Harga Beranda & Cockpit Mapping (`app.js`, `home-price-chart.js`, `styles.css`): Kontrol segmen timeframe [M15 | M5], tombol Alarm SVG modern, refresh, dan fullscreen.
+  * Retensi 180 Hari POI History (`mapping-history-engine.js`): Penyimpanan 6 bulan dengan arsip harian permanen & union-merge GitHub Cloud Sync.
+  * Pure Helper Modules (`cockpit-bridge-helpers.js`, `tests/pro-95-upgrades.test.mjs`): Jembatan POI Mapping ke Jurnal (`buildMappingJournalPrefill`), evaluasi lock berita (`evaluateMappingNewsLock`), evaluasi kesiapan pemula (`evaluateLevel0Readiness`), dan ringkasan 7 hari jurnal.
+
 ## 2.0.0-pro.472
 
 - feat(notification): Penggantian menyeluruh notifikasi HP Android & foreground Web Amy FX Pro ke sistem POI Mapping Cockpit (M5 & M15 FVG & OB).
