@@ -1,6 +1,6 @@
 /* Amy FX Academy — Deep Mastery Enrichment Layer (Modul 01–36)
  * Memperdalam seluruh 36 modul inti agar bebas kebingungan saat mapping nyata:
- * - extraConceptBlocks: bedah logika mendalam pada topik paling membingungkan (DOL, FVG, OB, Dealing Range, IDM, CISD, MTF, AMD, dll.)
+ * - extraConceptBlocks: bedah logika mendalam pada topik paling membingungkan (DOL, FVG, OB, Dealing Range, Sweep vs Liquidity Run, CISD, MTF, AMD, dll.)
  * - mappingSteps: panduan mekanis langkah demi langkah menggambar langsung di chart kosong
  * - decisionTree: pohon keputusan IF -> THEN untuk kasus abu-abu di chart nyata
  * - failedCase: bedah kasus gagal (kenapa setup yang terlihat mirip malah kena SL)
@@ -248,7 +248,7 @@
 
     'multi-timeframe-h1-m15-m5': {
       mappingSteps: [
-        'Bagi peran 3 timeframe secara kaku (jangan ditukar!): **H1 = Peta Arah & Zona Besar (Bias + HTF POI)**, **M15 = Peta Liquidity & Persiapan (Asia Range, Inducement, M15 POI)**, **M5 = Pelatuk Eksekusi (Sweep + CISD/MSS + Entry)**.',
+        'Bagi peran 3 timeframe secara kaku (jangan ditukar!): **H1 = Peta Arah & Zona Besar (Bias + HTF POI)**, **M15 = Peta Liquidity & Persiapan (Asia Range, EQH/EQL, M15 POI)**, **M5 = Pelatuk Eksekusi (Sweep + CISD/MSS + Entry)**.',
         'Aturan **Top-Down 100%**: selalu mulai menggambar dari H1 → turun ke M15 → terakhir baru buka M5 saat harga SUDAH tiba di POI H1/M15.',
         'Jika harga belum menyentuh zona pilihan di H1/M15, **dilarang menatap M5** agar tidak tergoda entry acak di tengah jalan.'
       ],
@@ -402,44 +402,44 @@
     'inducement-idm-umpan-ritel': {
       extraConceptBlocks: [
         {
-          heading: 'Cara Paling Mudah Mengenali Inducement (IDM) di Chart Nyata',
+          heading: 'Cara Mekanis Menguji Aftermath 1–3 Candle Pasca-Tembusan Liquidity',
           paragraphs: [
-            'Banyak trader bingung membedakan Inducement dengan POI. Rumus visualnya sangat sederhana: **Inducement adalah Swing Internal PERTAMA yang terletak tepat di depan kotak POI utamamu (Discount/Premium).**',
-            'Bayangkan kamu punya Bullish OB/FVG bagus di harga 2.642 (Discount). Tepat di atasnya di harga 2.646 ada Swing Low kecil atau Trendline naik yang bikin trader ritel buru-buru Buy di 2.646. Swing Low 2.646 itulah **Inducement (umpan)**! Selama 2.646 belum ditembus turun, POI 2.642 belum punya bahan bakar — justru jika kamu ikut Buy di 2.646, **KAMULAH yang menjadi Inducement-nya**.'
+            'Kebingungan terbesar saat level `PDH/PDL` atau `Asia High/Low` tertembus adalah memutuskan apakah itu **Liquidity Sweep (Purge & Revert)** atau **Liquidity Run (Expansion)**. Aturan praktis ICT: **jangan pernah mengambil keputusan di detik candle sedang menembus level.**',
+            'Tunggu penutupan candle M15/H1 lalu evaluasi 1–3 candle M5 berikutnya: jika harga kembali masuk range disertai **Displacement berlawanan + FVG + CISD/MSS** (apalagi melawan HTF Bias di awal London/NY), maka itu **Purge & Revert** yang sah. Jika candle justru menutup body solid di luar level dan terus mempertahankan FVG searah menuju DOL lebih jauh, itu **Liquidity Run** — jangan pernah melawannya.'
           ]
         }
       ],
       mappingSteps: [
-        'Tandai dulu 1 kotak POI utamamu di zona Discount (untuk Buy) atau Premium (untuk Sell).',
-        'Lihat area tepat di depan POI tersebut: cari **Swing Low/High internal pertama** atau **Equal Lows/Highs kecil** yang menghalangi jalan menuju POI.',
-        'Beri label **`IDM ($$$)`** pada swing umpan itu — dan buat janji pada diri sendiri: **TIDAK ENTRY sebelum harga sweep IDM terlebih dahulu!**'
+        'Klasifikasikan setiap level kunci sebelum tersentuh: sisi yang berlawanan dengan HTF Bias = kandidat **Purge & Revert (Sweep)**; sisi yang searah menuju DOL utama = kandidat **Liquidity Run**.',
+        'Saat harga menembus level, baca penutupan body M15/H1 (*wick rejection* kembali ke dalam range vs *body close* penuh di luar level).',
+        'Konfirmasi lewat 1–3 candle aftermath di M5: wajib muncul **Displacement balik + CISD/MSS** sebelum mengambil posisi reversal.'
       ],
       decisionTree: [
         {
-          condition: 'Ada 2 Bullish FVG di satu leg naik: FVG #1 di atas (posisi 60%) dan FVG #2 di bawah (posisi 25% Discount). Bagaimana hubungannya dengan Inducement?',
-          action: 'FVG #1 di atas hampir selalu berfungsi sebagai **Inducement (umpan)** yang memancing pembeli cepat — harga memantul kecil di FVG #1 lalu menjebolnya (sweep SL mereka) tepat masuk ke **FVG #2 di Discount** sebelum terbang sesungguhnya!'
+          condition: 'Harga menyapu Asia Low saat Daily/H1 Bullish dan masuk ke H1 Discount FVG, lalu M5 mencetak Displacement naik + CISD.',
+          action: '**Liquidity Sweep (Purge & Revert) terkonfirmasi!** Valid menyusun entry BUY menuju Asia High dan PDH.'
         },
         {
-          condition: 'Bagaimana jika harga sudah sweep Asia Low atau SSL jelas sebelum menyentuh POI-ku? Apakah masih perlu mencari IDM lain?',
-          action: 'Tidak perlu memaksa mencari IDM tambahan — **Asia Low / SSL yang baru di-sweep itulah Liquidity penggeraknya (Inducement-nya)**.'
+          condition: 'Daily/H1 Bullish menuju PDH yang masih $15 di atas; harga baru saja menembus Asia High dengan Body Close penuh tanpa wick penolakan.',
+          action: '**Liquidity Run (Expansion)!** Dilarang SELL counter-trend hanya karena BSL Asia High disentuh — biarkan harga melaju menuju DOL PDH atau cari pullback searah tren.'
         }
       ],
       failedCase: {
-        title: 'Masuk di POI Pertama Tanpa Menunggu IDM Di-sweep',
-        context: 'Melihat FVG pertama di 58% Premium langsung pasang Buy Limit tanpa sadar ada Swing Low rapi (IDM) tepat di bawahnya dan OB utama di 25% Discount.',
-        whyFailed: 'Harga menyentuh FVG pertama, naik tipis 10 pips, lalu dibanting turun sweep IDM dan SL, baru memantul mulus dari OB 25% Discount.'
+        title: 'Menjual di Tengah Liquidity Run Karena Salah Mengira Setiap BSL Pasti Berbalik',
+        context: 'Pada hari Bullish menuju PDH 2.670 (setelah Asia Low sudah di-sweep), trader langsung SELL saat Asia High 2.654 ditembus body penuh M15 tanpa ada CISD turun.',
+        whyFailed: 'Tembusan searah HTF Bias menuju DOL jauh adalah Liquidity Run (Expansion), bukan Purge & Revert — posisi SELL counter-trend langsung tersapu menuju PDH.'
       },
       extraQuiz: [
         {
-          question: 'Di dalam leg naik H1/M15, terdapat 1 Swing Low internal tepat di atas zona Bullish OB utama (Discount 25%). Apa peran Swing Low internal tersebut dalam peta ICT?',
+          question: 'Pada hari Daily & H1 Bullish dengan DOL di `PDH 2.670`, London Open menyapu `Asia Low 2.646` lalu M5 mencetak Displacement naik + CISD. Satu jam kemudian `Asia High 2.654` ditembus oleh Body Close M15 penuh. Apa perbedaan fungsi kedua kejadian tersebut dalam ICT?',
           options: [
-            'Sebagai titik wajib untuk langsung all-in Buy',
-            'Sebagai **Inducement (IDM)** — umpan Liquidity yang harus di-sweep dulu sebelum harga memantul kuat dari Bullish OB Discount',
-            'Sebagai target Take Profit akhir',
-            'Sebagai tanda tren sudah berubah Bearish total'
+            'Keduanya sama-sama sinyal wajib SELL',
+            'Tembusan `Asia Low 2.646` adalah **Liquidity Sweep (Purge & Revert)**, sedangkan tembusan `Asia High 2.654` searah menuju PDH adalah **Liquidity Run (Expansion)**',
+            'Tembusan `Asia Low` adalah tren turun permanen, sedangkan `Asia High` adalah konsolidasi Asia',
+            'Keduanya harus diabaikan karena terjadi di dalam London Killzone'
           ],
           answerIndex: 1,
-          explanation: 'Swing internal pertama di depan POI Discount adalah Inducement (IDM). Menunggu IDM di-sweep mencegahmu menjadi bahan bakar Liquidity.'
+          explanation: 'Sapu sisi berlawanan Bias di awal sesi (Asia Low) = Purge & Revert; tembusan sisi searah Bias menuju DOL lebih tinggi (Asia High → PDH) = Liquidity Run.'
         }
       ]
     },
@@ -472,7 +472,7 @@
         {
           heading: 'Cara Memilih Jika Ada 2–3 FVG Bertumpuk dalam Satu Dorongan (Solusi Kebingungan Terbesar!)',
           paragraphs: [
-            'Di XAU/USD, satu leg Displacement sering meninggalkan **2 sampai 3 kotak FVG sekaligus** (atas, tengah, bawah). Trader akhirnya bingung mau tunggu yang mana. Gunakan **Aturan 3 Jenis Gap ICT**:\n1. **Breakaway Gap (FVG paling awal dekat asal breakout):** Sering **TIDAK disentuh lagi** karena momentum terlalu kuat — jangan memaksa menunggu terlalu dalam jika struktur sudah lari.\n2. **Measuring / Runaway Gap (FVG di tengah dorongan, dekat Discount/Premium 50%–62%):** Ini **FVG paling ideal untuk retest entry** dan sering menjadi titik tengah seluruh jarak ekspansi!\n3. **Exhaustion Gap (FVG paling ujung setelah harga sudah sangat jauh/dekat DOL):** **JANGAN DI-ENTRY!** Ini sering menjadi celah terakhir sebelum harga berbalik.\n\nJika ada 2 FVG di dalam zona Discount (untuk Buy): prioritaskan **FVG yang memiliki konfluensi (overlap OB / OTE 62%–79% / ada Inducement di depannya)** atau tunggu reaksi penolakan M5 saat harga masuk FVG pertama vs kedua.'
+            'Di XAU/USD, satu leg Displacement sering meninggalkan **2 sampai 3 kotak FVG sekaligus** (atas, tengah, bawah). Trader akhirnya bingung mau tunggu yang mana. Gunakan **Aturan 3 Jenis Gap ICT**:\n1. **Breakaway Gap (FVG paling awal dekat asal breakout):** Sering **TIDAK disentuh lagi** karena momentum terlalu kuat — jangan memaksa menunggu terlalu dalam jika struktur sudah lari.\n2. **Measuring / Runaway Gap (FVG di tengah dorongan, dekat Discount/Premium 50%–62%):** Ini **FVG paling ideal untuk retest entry** dan sering menjadi titik tengah seluruh jarak ekspansi!\n3. **Exhaustion Gap (FVG paling ujung setelah harga sudah sangat jauh/dekat DOL):** **JANGAN DI-ENTRY!** Ini sering menjadi celah terakhir sebelum harga berbalik.\n\nJika ada 2 FVG di dalam zona Discount (untuk Buy): prioritaskan **FVG yang memiliki konfluensi (overlap OB / OTE 62%–79% / dekat SSL segar yang siap di-sweep)** atau tunggu reaksi penolakan M5 saat harga masuk FVG pertama vs kedua.'
           ]
         }
       ],
@@ -485,7 +485,7 @@
       decisionTree: [
         {
           condition: 'Ada 3 Bullish FVG bertumpuk dari bawah (2.640) sampai atas (2.656), garis 50% Dealing Range ada di 2.648. Mana yang dipilih?',
-          action: 'Coret FVG di atas 2.648 (karena masuk zona mahal/Premium). Fokus hanya pada FVG di **bawah 2.648 (Discount)** — jika ada dua di Discount, pilih yang paling dekat dengan **OTE (62%–79%)** atau yang tepat di bawah Inducement.'
+          action: 'Coret FVG di atas 2.648 (karena masuk zona mahal/Premium). Fokus hanya pada FVG di **bawah 2.648 (Discount)** — jika ada dua di Discount, pilih yang paling dekat dengan **OTE (62%–79%)** atau yang berkonfluensi dengan Order Block.'
         },
         {
           condition: 'Wick candle M5 menusuk melewati garis 50% CE sampai hampir menyentuh dasar FVG, tetapi **Body Close kembali di atas 50% CE**. Valid atau gagal?',
@@ -687,47 +687,47 @@
 
     'model-turtle-soup-smr': {
       mappingSteps: [
-        'Tandai level ekstrem besar yang menjadi magnet utama: **PDH/PDL, PWH/PWL, atau London/Asia High-Low**.',
-        'Tunggu harga menembus level tersebut di jam Killzone lalu **cepat ditarik masuk kembali** menutup body di dalam range lama.',
-        'Tambahkan pengaman wajib: cek **SMT Divergence** (atau minimal tunggu **CISD M5**) sebelum klik entry — jangan menangkap pisau jatuh saat candle masih melejit.'
+        'Tandai level ekstrem besar yang menjadi target utama: **PDH/PDL, PWH/PWL, atau London/Asia High-Low** yang berhimpitan dengan POI H1/H4.',
+        'Tunggu harga menembus level tersebut di jam Killzone lalu **cepat ditolak kembali** membentuk Absorption Wick dan menutup body di dalam range lama.',
+        'Konfirmasi dengan **CISD M5** (atau tambahan **SMT Divergence**) sebelum membuka posisi — hindari entry melawan candle impulsif yang masih bergerak kuat.'
       ],
       decisionTree: [
         {
-          condition: 'Harga menembus PDL lalu 3 candle M5 berturut-turut malah tetap tutup merah tebal di bawah PDL. Masih boleh Turtle Soup Buy?',
-          action: '**DILARANG KERAS!** Itu ekspansi lanjutan, bukan Turtle Soup. Turtle Soup sejati selalu menunjukkan **penolakan cepat kembali masuk ke dalam range**.'
+          condition: 'Harga menembus PDL lalu 3 candle M5 berturut-turut menutup body bearish tebal di bawah PDL. Apakah masih valid untuk Turtle Soup Buy?',
+          action: '**BATAL.** Penutupan body tegas di luar level menandakan ekspansi lanjutan, bukan Turtle Soup. Turtle Soup mensyaratkan penolakan cepat kembali masuk ke dalam range.'
         },
         {
-          condition: 'Turtle Soup sudah menunjukkan sweep + tutup balik ke dalam range, tapi posisinya melawan tren utama H1.',
-          action: 'Wajib perkecil ekspektasi target (**ambil TP1 cepat di IRL/Equilibrium 50%**) atau tambah syarat konfluensi **SMT Divergence** agar tidak kena sweep tren utama.'
+          condition: 'Turtle Soup sudah menunjukkan sweep + tutup kembali ke dalam range, tetapi berlawanan dengan tren utama H1.',
+          action: 'Perkecil target profit (**ambil TP1 konservatif di IRL/Equilibrium 50%**) atau tambahkan konfluensi **SMT Divergence** agar tidak terseret kelanjutan tren H1.'
         }
       ],
       failedCase: {
-        title: 'Menangkap Pisau Jatuh Saat Berita Besar',
-        context: 'Saat rilis NFP, harga jatuh menembus PDL -$15 dalam 2 menit lalu trader klik Buy mengira Turtle Soup.',
-        whyFailed: 'Tanpa penutupan balik ke dalam range dan di tengah rilis berita, harga lanjut jatuh -$25 lagi sweep akun.'
+        title: 'Melawan Candle Ekspansi Saat Rilis Berita Besar',
+        context: 'Saat rilis NFP, harga turun menembus PDL -$15 dalam 2 menit lalu trader langsung membuka Buy dengan asumsi Turtle Soup.',
+        whyFailed: 'Tanpa penutupan balik ke dalam range dan dilakukan di tengah rilis berita berdampak tinggi, harga melanjutkan penurunan -$25 menembus Stop Loss.'
       }
     },
 
     'memilih-1-model-dan-filter-gagal': {
       mappingSteps: [
-        'Pilih **HANYA 1 Model Utama** dari 4 model (rekomendasi terbaik untuk 90% trader: **Model 1 Sweep → MSS → FVG** atau **IFVG**).',
-        'Tempelkan **5 Bendera Merah Auto-Skip** di depan layar: (1) Di luar Killzone, (2) Dalam jendela News Lock, (3) Melawan Bias/DOL H1 tanpa sweep HTF, (4) Lokasi di zona salah Premium/Discount, (5) Sudah mencapai batas Daily Loss Guard.',
-        'Sebelum klik order, cek 5 Bendera Merah itu — **1 bendera merah saja menyala = NO TRADE!**'
+        'Tetapkan **1 Model Utama** (rekomendasi terbaik untuk sebagian besar trader: **Model ICT 2022: Sweep → MSS → FVG**) untuk 30–50 transaksi pertama.',
+        'Periksa **5 Bendera Merah Auto-Skip**: (1) tengah range 40%–60% tanpa sweep, (2) berhadapan langsung dengan POI H1/H4 lawan, (3) dalam jendela News Lock, (4) R:R < 1:1,8, (5) batas rugi harian 2× SL sudah tercapai.',
+        'Apabila **satu saja** bendera merah aktif, batalkan setup dan catat NO SETUP di jurnal.'
       ],
       decisionTree: [
         {
-          condition: 'Model utamaku tidak muncul seharian ini, tapi model lain kelihatan muncul di M5. Ambil atau lewatkan?',
-          action: '**Lewatkan!** Disiplin 1 model adalah rahasia konsistensi data Jurnal. Mencampur 4 model membuat kamu tidak pernah tahu mana yang benar-benar menghasilkan uang untukmu.'
+          condition: 'Model utama tidak muncul seharian, tetapi variasi model lain terlihat di M5. Ambil atau lewatkan?',
+          action: '**Lewatkan.** Disiplin menjalankan 1 model selama 30–50 transaksi menjaga kemurnian data Win Rate dan Expectancy pada jurnal evaluasi.'
         },
         {
-          condition: 'Dari 5 Bendera Merah Auto-Skip, 4 hijau aman tapi 1 menyala (berita CPI 10 menit lagi). Boleh tetap entry kecil?',
-          action: '**TIDAK BOLEH!** Aturan filter gagal bersifat **mutlak (veto)** — 1 bendera merah saja menyala berarti tangan lepas dari tombol order.'
+          condition: 'Dari 5 poin Checklist 30 Detik, 4 poin terpenuhi tetapi 1 poin gagal (berita CPI 10 menit lagi). Apakah boleh masuk dengan lot kecil?',
+          action: '**TIDAK BOLEH.** Aturan filter gagal bersifat mutlak — satu syarat yang gagal cukup untuk membatalkan setup sepenuhnya.'
         }
       ],
       failedCase: {
-        title: 'Strategi Gado-Gado (Ganti Model Setiap Jam)',
-        context: 'Pagi pakai Turtle Soup, siang pakai OB, malam ganti IFVG karena tidak sabar menunggu.',
-        whyFailed: 'Tidak ada satu pun model yang dikuasai nuansanya — semua dilakukan setengah matang dan hasilnya acak.'
+        title: 'System Hopping (Berpindah Model Setiap Sesi)',
+        context: 'Pagi memakai Turtle Soup, siang memakai Order Block, malam beralih ke iFVG setelah mengalami 2 kali Stop Loss.',
+        whyFailed: 'Tidak ada satu pun model yang memiliki sampel statistik memadai sehingga hasil evaluasi di jurnal tidak terukur.'
       }
     },
 
@@ -921,93 +921,93 @@
 
     'sl-struktural-napas-spread-tp': {
       mappingSteps: [
-        'Tentukan **Titik Invalidasi Struktural** (di balik wick sweep / di balik kotak OB+FVG — bukan angka acak "$2 saja biar tipis").',
-        'Tambahkan **Napas Spread & Buffer Gold** (`+$0.40 s.d. +$0.80`) — terutama pada posisi SELL karena ditutup oleh garis ASK.',
-        'Bagi target menjadi 2 lapis: **TP1 (Internal Liquidity / minimal 1:1.5–1:2)** untuk mengamankan posisi, dan **TP2 (DOL utama / PDH-PDL / -2.0 Std Dev)** untuk panen maksimal.'
+        'Tentukan **Titik Invalidasi Struktural** (di balik ujung wick sweep / Swing ekstrem — bukan jarak tetap arbitrer).',
+        'Tambahkan **Buffer Spread & Wick Gold** (`$0,60–$1,20`) — khususnya pada posisi SELL karena dieksekusi oleh garis ASK.',
+        'Petakan target 2 tingkat: **TP1 (Liquidity Pool terdekat / minimal 1,5R–2R)** untuk pengamanan profit, dan **TP2 (DOL H1 / PDH–PDL)** untuk sisa posisi.'
       ],
       decisionTree: [
         {
-          condition: 'SL struktural jaraknya $6, sementara target terdekat (DOL) hanya berjarak $7 (R:R cuma 1:1.1). Tetap diambil?',
-          action: '**SKIP!** Setup dengan R:R di bawah **1:1.5** tidak sepadan secara matematis. Tunggu retrace lebih dalam (entry lebih tajam) atau lewati setup tersebut.'
+          condition: 'SL struktural berjarak $6,00, sementara target terdekat (DOL) hanya berjarak $7,00 (R:R 1:1,17). Apakah layak diambil?',
+          action: '**SKIP.** Setup dengan R:R di bawah **1:1,8–1:2** tidak sepadan secara matematis. Tunggu retracement lebih dalam atau lewati setup tersebut.'
         },
         {
-          condition: 'Boleh menaruh TP2 tepat di atas garis PDH persis atau sedikit di bawahnya?',
-          action: 'Taruh **TP sedikit di dalam (front-run $0.50–$1.00 sebelum ujung PDH/PDL)**! Harga Gold sering berbalik beberapa puluh sen sebelum tepat menyentuh ujung wick absolut.'
+          condition: 'Apakah TP2 sebaiknya ditempatkan tepat pada garis PDH/PDL atau sedikit di dalamnya?',
+          action: 'Tempatkan **TP sedikit di dalam (`$0,30–$0,60` sebelum ujung PDH/PDL)** dan perhitungkan garis Ask pada posisi SELL agar eksekusi target tidak terlewat.'
         }
       ],
       failedCase: {
-        title: 'Meletakkan SL di Tengah-Tengah Kotak FVG Supaya Bisa Pasang Lot Besar',
-        context: 'Agar bisa buka 0.10 lot, SL dipersempit jadi $1.20 tepat di dalam area retest normal Gold.',
-        whyFailed: 'Harga retest sehat ke 50% CE lalu terbang +120 pips, tapi posisi sudah terlempar duluan karena SL ditaruh di zona gerak normal.'
+        title: 'Mempersempit SL ke Tengah FVG Demi Memperbesar Lot',
+        context: 'Agar dapat membuka 0,10 lot, trader mempersempit SL menjadi $1,20 di dalam area retracement normal Gold.',
+        whyFailed: 'Retracement normal ke 50% CE menyentuh SL terlebih dahulu sebelum harga bergerak +120 pips sesuai arah analisis.'
       }
     },
 
     'manajemen-trade-partial-bep-notrade': {
       mappingSteps: [
-        'Tulis aturan Partial & BEP sebelum masuk posisi: contoh saat menyentuh **1:1.5 atau TP1**, tutup **50% lot** lalu geser SL ke **BEP (+$0.30 untuk menutup komisi)**.',
-        'Setelah posisi sudah **Risk-Free (BEP)**, biarkan sisa 50% melaju tenang menuju TP2 (DOL) tanpa memelototi setiap detik candle M1.',
-        'Tetapkan **Aturan No-Trade Day**: tidak entry saat hari libur bank AS (Bank Holiday), setelah 2× SL beruntun (Daily Loss Guard aktif), atau saat kondisi emosi sedang lelah/marah.'
+        'Tetapkan aturan Partial & BEP sebelum membuka posisi: saat menyentuh **TP1 (`≥ 1,5R–2R`)**, tutup **60%–75% lot** lalu geser SL sisa lot ke **BEP+ (`+$0,30–$0,50`)**.',
+        'Setelah posisi menjadi **bebas risiko (BEP+)**, biarkan sisa volume menuju TP2 (DOL) tanpa memantau setiap detik candle M1.',
+        'Patuhi **Daily Loss Guard (`Maks 2× SL/hari`)** dan hindari **No-Trade Days** (US Bank Holiday, Pra-FOMC, dan Seek & Destroy).'
       ],
       decisionTree: [
         {
-          condition: 'Posisi baru floating profit +$2 (belum 1:1) tapi aku deg-degan dan ingin cepat geser SL ke BEP sekarang juga.',
-          action: '**JANGAN geser BEP terlalu dini!** Di XAU/USD, retest ringan sebelum ekspansi sangat sering sweep BEP yang digeser terlalu cepat — tunggu minimal **1:1.2–1:1.5** atau setelah struktur internal baru tembus.'
+          condition: 'Posisi baru floating profit +0,5R dan muncul dorongan segera memindahkan SL ke BEP.',
+          action: '**Jangan geser BEP terlalu dini.** Retracement normal XAU/USD sering menyentuh BEP yang terlalu cepat — tunggu minimal TP1 (`≥ 1,5R–2R`) atau terbentuk struktur baru.'
         },
         {
-          condition: 'Harga sudah menyentuh TP1 (1:2) lalu mulai membentuk candle penolakan keras di HTF POI lawan. Tahan buta sampai TP2 atau amankan?',
-          action: '**Amankan Partial 50%–70% + geser SL ke BEP (atau trailing di balik swing M5 terakhir)**! Manajemen aktif mengikuti struktur baru jauh lebih cerdas daripada menonton profit besar berbalik jadi 0.'
+          condition: 'Harga sudah menyentuh TP1 (2R) lalu mulai menunjukkan penolakan keras di POI HTF lawan.',
+          action: 'Amankan **Partial Close 60%–75%** dan geser SL sisa lot ke **BEP+** agar keuntungan tidak berbalik menjadi kerugian.'
         }
       ],
       failedCase: {
-        title: 'Menghapus Stop Loss Saat Harga Mendekati SL ("Bentar Lagi Balik")',
-        context: 'Menggeser SL menjauh 2 kali saat harga bergerak melawan posisi karena tidak rela menerima rugi -1%.',
-        whyFailed: 'Satu keputusan emosional itu mengubah rugi disiplin -1% menjadi kerugian fatal -12% dan menghancurkan psikologi sebulan penuh.'
+        title: 'Menggeser Stop Loss Menjauh Saat Harga Mendekati SL',
+        context: 'Trader menggeser SL menjauh dua kali ketika harga bergerak berlawanan karena enggan menerima rugi -1%.',
+        whyFailed: 'Satu pelanggaran tersebut mengubah kerugian terukur -1% menjadi drawdown berat -12%.'
       }
     },
 
     'psikologi-scalper-anti-fomo': {
       mappingSteps: [
-        'Aktifkan **Daily Loss Guard** di Jurnal Amy FX Pro (misal batas maksimal **-2% atau 2× SL per hari**) — begitu tersentuh, aplikasi mengunci sesi harimu secara objektif.',
-        'Jika kena SL, lakukan **Aturan Jeda 30 Menit**: tutup chart, minum air, catat di Jurnal apakah SL itu *Good Loss* (sesuai SOP) atau *Bad Loss* (melanggar aturan).',
-        'Hadapi **FOMO** dengan mantra probabilitas: *"Pasar XAU/USD buka 250 hari setahun — ketinggalan 1 candle bukan kerugian, tapi masuk asal-asalan adalah kerugian nyata."*'
+        'Aktifkan **Daily Loss Guard** di Jurnal Amy FX Pro (batas maksimal **-2% atau 2× SL per hari**).',
+        'Setiap kali terkena SL, terapkan **Jeda Wajib 30 Menit**: tutup chart dan catat di Jurnal apakah SL tersebut sesuai SOP atau melanggar aturan.',
+        'Atasi **FOMO** dengan mengingat probabilitas sesi: terdapat ratusan sesi London dan NY per tahun sehingga melewatkan satu peluang menjaga modal tetap utuh.'
       ],
       decisionTree: [
         {
-          condition: 'Baru kena SL, lalu 3 menit kemudian aku melihat setup baru dan jantung berdebar ingin segera balas modal. Boleh klik?',
-          action: '**STOP! Itu 100% Revenge Trading.** Wajib patuhi jeda 30 menit — peluang yang benar-benar bagus tidak akan membuatmu panik dalam 3 menit.'
+          condition: 'Baru terkena SL, lalu 3 menit kemudian muncul dorongan membuka posisi baru agar segera balik modal.',
+          action: '**STOP — itu merupakan Revenge Trading.** Patuhi jeda wajib 30 menit sebelum mengevaluasi pasar kembali.'
         },
         {
-          condition: 'Hari ini aku sedang stres/kurang tidur/emosi dari urusan di luar trading, tapi jam London sudah buka.',
-          action: '**Pilih NO-TRADE DAY!** Kondisi mental menentukan 70% kualitas eksekusi — chart Gold akan selalu ada besok saat kepalamu jernih.'
+          condition: 'Kondisi fisik kurang tidur atau sedang lelah saat sesi London dibuka.',
+          action: '**Tetapkan sebagai No-Trade Day.** Kondisi mental yang tidak optimal meningkatkan risiko kesalahan eksekusi.'
         }
       ],
       failedCase: {
-        title: 'Spiral Balas Dendam Setelah 1 Kali SL',
-        context: 'Kena SL disiplin -1%, merasa kesal lalu langsung masuk lagi 3× dengan lot 2× lebih besar di luar Killzone.',
-        whyFailed: 'Rugi -1% yang sangat normal berubah menjadi -9% dalam 45 menit karena emosi mengambil alih kemudi.'
+        title: 'Revenge Trading Setelah 1 Kali SL',
+        context: 'Setelah terkena SL disiplin -1%, trader langsung masuk 3 kali berturut-turut dengan lot 2× lebih besar di luar Killzone.',
+        whyFailed: 'Kerugian normal -1% berkembang menjadi -9% dalam 45 menit akibat keputusan emosional.'
       }
     },
 
     'protokol-100-sample-mandiri': {
       mappingSteps: [
-        'Kumpulkan **100 Sample Terukur** (gabungan Latihan 100 Kasus ICT + Backtest Replay + Jurnal Eksekusi) memakai **1 Model Utama** yang konsisten.',
-        'Evaluasi data setiap **20 trade**: cek Win-Rate, Average R:R, sesi paling profit (London vs NY), dan kesalahan berulang (misal sering lawan H1 atau entry di luar Killzone).',
-        'Jangan menaikkan modal secara drastis sebelum 100 sample menunjukkan **ekspektansi positif** dan kepatuhan SOP di atas **85%**.'
+        'Kumpulkan **100 Sample Terukur** (50 Backtest Replay → 30 Forward Test Demo/Cent → 20 Live Terukur) memakai **1 Model Utama** secara konsisten.',
+        'Evaluasi data setiap **20–30 transaksi**: periksa Profit Factor, Expectancy, Max Drawdown, sesi terbaik, dan tingkat pelanggaran SOP.',
+        'Lakukan scaling modal secara bertahap hanya setelah rapor memenuhi **Profit Factor ≥ 1,40**, **Max Drawdown < 8%**, dan **pelanggaran SOP < 10%**.'
       ],
       decisionTree: [
         {
-          condition: 'Dari 20 trade di Jurnal, ternyata 70% kerugianku berasal dari sesi Asia dan transaksi ke-3 di hari yang sama. Apa langkah perbaikannya?',
-          action: 'Cukup **hapus dua kebocoran itu** (larang trade sesi Asia + batasi maksimal 2 trade/hari) — sering kali tanpa mengubah teknik ICT sama sekali, kurva profit langsung berubah positif!'
+          condition: 'Dari 20 transaksi di Jurnal, 70% kerugian berasal dari sesi Asia dan transaksi ke-3 di hari yang sama.',
+          action: 'Hapus kedua sumber kebocoran tersebut (fokus hanya Killzone London/NY dan batasi maksimal 2 transaksi/hari) tanpa perlu mengganti strategi.'
         },
         {
-          condition: 'Setelah 100 sample Demo/Cent profit konsisten, berapa kenaikan modal yang sehat?',
-          action: 'Naikkan risiko/modal secara **bertahap (misal 2× ukuran akun Cent → akun Standard risiko 0.5% dulu selama 30 trade)** agar psikologi beradaptasi mulus tanpa kaget melihat angka dolar.'
+          condition: 'Setelah 100 sample Demo/Cent konsisten, bagaimana cara menaikkan modal yang aman?',
+          action: 'Naikkan ukuran akun secara bertahap dan awali di akun Standard dengan risiko **0,5%** selama 30 transaksi pertama.'
         }
       ],
       failedCase: {
-        title: 'Menilai Keberhasilan Strategi Hanya Dari 3 Trade',
-        context: 'Mencoba 3 kali trade, kalah 2 kali, lalu langsung menyimpulkan "ICT tidak bekerja di Gold".',
-        whyFailed: '3 trade tidak punya arti statistik sedikit pun. Keunggulan probabilitas baru terlihat nyata pada sampel 30–100 transaksi disiplin.'
+        title: 'Menilai Strategi Hanya Dari 3 Transaksi',
+        context: 'Setelah 3 transaksi dengan 2 kali SL, trader langsung menyimpulkan strategi tidak bekerja dan berpindah metode.',
+        whyFailed: 'Sampel 3 transaksi tidak memiliki signifikansi statistik; keunggulan probabilitas baru terlihat pada 30–100 transaksi disiplin.'
       }
     }
   };
