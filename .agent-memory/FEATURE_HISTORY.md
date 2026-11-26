@@ -1,5 +1,9 @@
 # Feature History
 
+## 2026-11-25 — Live Harga Gold XAU/USD via Shared 1-Connection Twelve Data WebSocket Hub
+- **Hub WebSocket Tunggal Anti-Bentrok (`lib/live-price-ws-hub.mjs`, `api/live-price.js`, `tools/serve-local.mjs`):** Mengganti koneksi WebSocket per-tab yang putus tiap 20 detik menjadi **1 koneksi WebSocket permanen** ke Twelve Data `XAU/USD` yang di-broadcast serentak ke semua tab/pengguna (hemat slot `1/1` Basic 8, *instant replay* harga terakhir, auto-reconnect, dan endpoint cek status `/api/live-price?mode=status`).
+- **Rute Same-Origin Beranda & Mapping (`home-price-chart.js`, `apps/mapping/js/ict-workspace/app.js`):** Beranda dan Mapping kini langsung terhubung ke `/api/live-price` milik server aktif (termasuk AI Studio Preview, Termux lokal, maupun Vercel) serta langsung menyinkronkan harga live ke candle aktif & seluruh widget tanpa menyentuh layout Chart Gold/Peta Harga. Terverifikasi 4/4 unit tests (`tests/live-price-ws-hub.test.mjs`) dan 28 tick live nyata di Chromium (0 console errors).
+
 ## 2026-11-25 — Upgrade Aditif 5 Pilar Amy FX Pro (Command Strip Beranda, Lot Sync & POI Breakdown, AMY Briefing 30 Detik, Jurnal Playbook & Leak Detector, Backend Multi-Key + Backup Lengkap)
 - **Mapping Cockpit (`mapping-history-engine.js`, `lot-calculator.js`, `dashboard-v2.js`, `ict-dashboard-v2.css`):** Kalkulator Lot kini otomatis membaca Saldo Aktif Profil + realized Riwayat POI + `% Risiko` Profil lengkap dengan tombol `Sync Profil` & preset `1.5%`, sementara panel Riwayat Reaksi & POI menampilkan tabel ringkas **Performa Jenis Zona (`OB/FVG/iFVG/BB`)** & **Performa Sesi (WITA)**.
 - **Beranda Command Center Strip (`app.js`, `styles.css`):** Strip 3 sel cepat tepat di bawah Peta Harga (`Saldo Aktif`, `Sesi & News`, `Kompas XAU` live dari `/api/macro-snapshot`) yang dapat diklik langsung ke Profil, Mapping, atau Market Intel tanpa menyentuh Peta Harga.
