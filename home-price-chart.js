@@ -388,17 +388,14 @@ export function mountHomeChart(root) {
     if(displayPrice&&!closed) view?.updateActiveCandle?.(displayPrice);
     if($('home-chart-source')){
       if(!last){
-        $('home-chart-source').textContent='Belum ada candle';
+        $('home-chart-source').textContent='';
       }else if(closed){
-        const timeStr=new Date((result.sourceTime||last.time)*1000).toLocaleString('id-ID',{timeZone:'Asia/Makassar',hour12:false});
-        const isWeekend=isWeekendClosure(Date.now()/1000);
-        const statusText=isWeekend?'Pasar Tutup (Akhir Pekan)':'Pasar Tutup';
-        $('home-chart-source').textContent=`${tf} · ${statusText} · Candle Terakhir ${timeStr} WITA`;
+        $('home-chart-source').textContent='Pasar Tutup';
       }else{
-        $('home-chart-source').textContent=`${tf} · ${result.fresh?'Candle terkini':'Referensi lama'}`;
+        $('home-chart-source').textContent=result.fresh?'':'Data tertunda';
       }
     }
-    if($('home-chart-note'))$('home-chart-note').textContent=result.plan?'Level entry, SL dan target: model ICT lokal, bukan setup Scalper server.':'';
+    if($('home-chart-note'))$('home-chart-note').textContent='';
   }
   function stop(){generation++;controller?.abort();clearTimeout(timer);}
   async function refresh(){
@@ -440,7 +437,7 @@ export function mountHomeChart(root) {
     } catch {
       if(disposed||id!==generation)return;
       if(raw)raw.degraded=true;
-      render(true);$('home-chart-error').textContent='Pembaruan gagal. Data sebelumnya hanya referensi lama.';
+      render(true);$('home-chart-error').textContent='Gagal memuat data chart.';
     } finally {
       clearTimeout(timeout);
       if(!disposed&&id===generation){

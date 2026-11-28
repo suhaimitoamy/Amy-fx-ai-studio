@@ -1,5 +1,8 @@
 # Feature History
 
+## 2026-11-28 — Kompas Bias 3-TF Interaktif, Tangga Harga Vertikal Dealing Range & Poles Visual Rencana Eksekusi POI
+- **Visualisasi Interaktif Mapping (`apps/mapping/js/ict-workspace/mapping-visuals.js`, `dashboard-v2.js`, `apps/mapping/index.html`, `apps/mapping/css/ict-dashboard-v2.css`, `tests/mapping-visuals.test.mjs`):** Menghadirkan Kompas Bias 3-TF SVG interaktif (jarum berbobot `H1/M15/M5`, busur & tab TF klik, ADR Energy Bar) di card `XAU/USD Live`, Tangga Harga Vertikal Interaktif SVG (zona OTE Sell/Buy, No-Trade EQ, pin harga live, plot POI BUY/SELL aktif, toggle `M15 | PDL–PDH`, inspektor klik) di card `Dealing Range`, serta penyegaran tata letak & tipografi card `Rencana Eksekusi POI` dengan paritas penuh Dark & Light Mode pada Desktop dan Mobile.
+
 ## 2026-11-27 — Perbaikan Editorial Bab 36 (Capstone: Protokol Mapping Mandiri dari Chart Kosong) & Penuntasan Seluruh 36 Bab
 - **Bab 36 Diperhalus (`apps/academy/data/mastery-advanced.js`, `apps/shared/amy-local-knowledge.js`):** Menyusun ulang Bab 36 (`capstone-mapping-mandiri`) sebagai penutup Bagian VI dan seluruh 36 bab buku Amy FX Academy (36.1 Urutan Kerja Top-Down Tanpa Indikator, 36.2 Tabel 6 Langkah Mapping Mandiri 10 Menit lengkap WITA/WIB, 36.3 Standar Chart Bersih Maksimal 5 Elemen & 4 Saringan POI, 36.4 5 Daftar Periksa Kelulusan Mandiri Sebelum Order, serta 36.5 Simulasi 10 Menit Chart Polos Rabu London WITA/WIB), menyelaraskan sapaan `Anda` (`Mandirimu`/`kosongmu` → `Mandiri Anda`/`kosong Anda`), dan menghaluskan istilah serta kapital. Terverifikasi 20/20 unit tests dan 0 kontaminasi SMC/CHoCH di seluruh kurikulum.
 

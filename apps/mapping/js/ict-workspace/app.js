@@ -318,19 +318,16 @@ function draw(degraded=false){
     updateDealingRangeBadge($('chart-dealing-range-badge'), displayPrice, dr);
   }
   if($('source')){
-    const timeStr=new Date((result.sourceTime||last.time)*1000).toLocaleString('id-ID',{timeZone:'Asia/Makassar',hour12:false});
     if(closed){
-      const statusText=isWeekendClosure(Date.now()/1000)?'Pasar Tutup (Akhir Pekan)':'Pasar Tutup';
-      $('source').textContent=`${statusText} · Candle Terakhir ${timeStr} WITA`;
+      $('source').textContent='Pasar Tutup';
     }else{
-      $('source').textContent=result.fresh?'Candle terkini':'Referensi lama';
+      $('source').textContent=result.fresh?'':'Data tertunda';
     }
   }
   if($('chart-note'))$('chart-note').textContent='';
   const coverage=$('ict-coverage');
   if(coverage){
-    const k=context?.amy?.levels,p=context?.amy?.pivots;
-    coverage.textContent=k?`MO: ${k.midnightStatus} · Asia: ${k.asiaStatus} · Pivot ${display?.pivotTf||'D'}: ${p?.[display?.pivotTf||'D']?'tersedia':'data periode belum lengkap'} · Bias M15 / trigger M5 tertutup`:'Menunggu konteks server; visual keputusan belum tersedia.';
+    coverage.textContent='';
   }
 
   // Sinkronisasi otomatis Snapshot Likuiditas ke Market Intel

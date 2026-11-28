@@ -953,24 +953,12 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
     macroSnap.quotes?.gold
   ].filter(q => q && Number.isFinite(Number(q.price))).length;
 
-  let syncText = 'Feed Offline';
-  let syncTone = 'offline';
-  if (macroSnap._sourceMode === 'live' && liveQuotesCount > 0) {
-    syncText = `Live Makro · ${liveQuotesCount}/4 Feed`;
-    syncTone = 'live';
-  } else if (macroSnap._sourceMode === 'cache' && liveQuotesCount > 0) {
-    syncText = `Cache Makro · ${liveQuotesCount}/4`;
-    syncTone = 'cache';
-  } else if (macroSnap._sourceMode === 'stale' && liveQuotesCount > 0) {
-    syncText = 'Cache >15m';
-    syncTone = 'cache';
-  }
-
   if (statusEl) {
+    const isOffline = liveQuotesCount === 0;
     const calSummary = usdEvents.length > 0
       ? `${todayUsd.length} agenda USD hari ini`
       : 'Kalender offline';
-    statusEl.textContent = `${timeStrWita} · ${syncText} · ${calSummary}`;
+    statusEl.textContent = isOffline ? `Data makro offline · ${calSummary}` : calSummary;
   }
 
   // Build 4-column Live Telemetry Strip
@@ -1103,11 +1091,6 @@ async function loadSentiment(isBackground = false, forceCtxRefresh = false) {
             <span class="km-kicker__title">KOMPAS MAKRO XAU/USD</span>
             <span class="km-sep" aria-hidden="true">·</span>
             <span>${escapeHtml(dateStrWita)}</span>
-            <span class="km-sep" aria-hidden="true">·</span>
-            <span class="km-sync tone-${escapeHtml(syncTone)}">
-              <span class="km-dot tone-${escapeHtml(syncTone)}" aria-hidden="true"></span>
-              ${escapeHtml(syncText)}
-            </span>
           </div>
           <h2 class="km-verdict tone-${escapeHtml(k.tone)}">${escapeHtml(k.verdictTitle)}</h2>
           <p class="km-summary">${escapeHtml(k.summary)}</p>
@@ -1411,13 +1394,12 @@ function renderNews(allNews, expandedIds = new Set(), updatedIso = null) {
       : allNews);
 
   if (status) {
-    const timeSuffix = updatedIso ? ` • ${formatTime(updatedIso)}` : '';
     if (currentNewsFilter === 'gold') {
-      status.textContent = `${filtered.length} berita Fokus Gold (dari ${allNews.length} feed)${timeSuffix}`;
+      status.textContent = `${filtered.length} berita Fokus Gold`;
     } else if (currentNewsFilter === 'high') {
-      status.textContent = `${filtered.length} berita High Impact Gold${timeSuffix}`;
+      status.textContent = `${filtered.length} berita High Impact`;
     } else {
-      status.textContent = `${filtered.length} total berita global${timeSuffix}`;
+      status.textContent = `${filtered.length} berita`;
     }
   }
 
@@ -1742,13 +1724,9 @@ function renderCalendar() {
   const isStale = cacheAgeMs > 24 * 60 * 60 * 1000;
 
   if (status) {
-    if (isCalendarLive) {
-      status.textContent = `${filtered.length} rilis ekonomi • Sinkronisasi Live (WITA)`;
-    } else if (isStale) {
-      status.textContent = `${filtered.length} rilis ekonomi • Cache Usang (>24 Jam)`;
-    } else {
-      status.textContent = `${filtered.length} rilis ekonomi • Cache Lokal`;
-    }
+    status.textContent = !isCalendarLive && isStale
+      ? `${filtered.length} rilis ekonomi · Data >24j`
+      : `${filtered.length} rilis ekonomi`;
   }
 
   if (filtered.length === 0) {
